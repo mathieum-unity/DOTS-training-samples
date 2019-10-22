@@ -101,11 +101,6 @@ public struct BezierData : IComponentData
 	public float3 anchor1;
 	public float3 anchor2;
 	public float3 endPoint;   
-}
-
-
-public struct NormalData : IComponentData
-{
 	public int3 startNormal;
 	public int3 endNormal;
 	public int3 startTangent;
@@ -122,14 +117,10 @@ public struct SplineT : IComponentData
 	public float Value;
 }
 
-public struct UpVector : IComponentData
+public struct UpForwardVector : IComponentData
 {
-	public float Value;
-}
-
-public struct ForwardVector : IComponentData
-{
-	public float Value;
+	public float UpValue;
+	public float ForwardValue;
 }
 
 public struct SplineSideDirection : IComponentData
