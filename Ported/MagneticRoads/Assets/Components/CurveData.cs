@@ -131,3 +131,9 @@ public struct ForwardVector : IComponentData
 {
 	public float Value;
 }
+
+public struct SplineSideDirection : IComponentData
+{
+	public byte DirectionValue;
+	public byte SideValue;
+}
