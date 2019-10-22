@@ -20,17 +20,17 @@ public class SplineEvaluationSystem : JobComponentSystem
         return pos;
     }
     [BurstCompile]
-    struct EvaluateSplinePosition : IJobForEach<SplineT, BezierData, SplineDirection, UpVector, Translation>
+    struct EvaluateSplinePosition : IJobForEach<SplineT, BezierData, SplineSideDirection, UpVector, Translation>
     {
         public void Execute([ReadOnly] ref SplineT t, 
             [ReadOnly] ref BezierData curve, 
-            [ReadOnly] ref SplineDirection dir, 
+            [ReadOnly] ref SplineSideDirection sideDirection, 
             [ReadOnly] ref UpVector up,
             ref Translation position)
         {
             var tValue = t.Value > 1.0f ? 1.0f : t.Value;
             
-            if (dir.Value < 0)
+            if (sideDirection.DirectionValue < 0)
             {
                 tValue = 1 - tValue;
             }

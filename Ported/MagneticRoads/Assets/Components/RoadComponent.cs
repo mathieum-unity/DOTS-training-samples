@@ -1,5 +1,58 @@
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
+
+public struct IntersectionElementData : IBufferElementData
+{
+	public float3 position;
+	public int3 normal;
+	public int neighbouringSpline0;
+	public int neighbouringSpline1;
+	public int neighbouringSpline2;
+
+	public int this[int index]
+	{
+		get
+		{
+			switch (index)
+			{
+				case 0: return neighbouringSpline0;
+				case 1: return neighbouringSpline1;
+				case 2: return neighbouringSpline2;
+			};
+
+			throw new System.IndexOutOfRangeException();
+		}
+		set
+		{
+			switch (index)
+			{
+				case 0: neighbouringSpline0 = value; return;
+				case 1: neighbouringSpline1 = value; return;
+				case 2: neighbouringSpline2 = value; return;
+			};
+
+			throw new System.IndexOutOfRangeException();
+		}
+	}
+}
+
+public struct TrackSplineElementData : IBufferElementData
+{
+	public int startIntersection;
+	public float3 startPoint;
+	public int3 startNormal;
+	public int3 startTangent;
+	public int endIntersection;
+	public float3 endPoint;
+	public int3 endNormal;
+	public int3 endTangent;
+	public float3 anchor1;
+	public float3 anchor2;
+	public int maxCarCount;
+	public float measuredLength;
+	public float carQueueSize;
+}
 
 public struct RoadComponent : IComponentData
 {
