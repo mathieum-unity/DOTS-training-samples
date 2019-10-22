@@ -195,19 +195,4 @@ public class TrackSpline{
 			}
 		}
 	}
-
-	public void DrawGizmos() {
-		Gizmos.color = Color.blue;
-
-		for (int j = -1; j <= 1; j++) {
-			Vector2 localPos = new Vector2(j * RoadGenerator.trackRadius,0f);
-			Vector3 point = Extrude(localPos,0f);
-			for (int i = 1; i <= 4; i++) {
-				float t = i / 4f;
-				Vector3 newPoint = Extrude(localPos,t);
-				Gizmos.DrawLine(point,newPoint);
-				point = newPoint;
-			}
-		}
-	}
 }
