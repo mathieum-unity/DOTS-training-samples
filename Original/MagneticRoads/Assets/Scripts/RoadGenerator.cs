@@ -1,8 +1,65 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Mathematics;
 
-public class RoadGenerator:MonoBehaviour {
+public struct IntersectionElementData : IBufferElementData
+{
+	public Vector3 position;
+	public Vector3 normal;
+	public int neighbouringSpline0;
+	public int neighbouringSpline1;
+	public int neighbouringSpline2;
+
+	public int this[int index]
+	{
+		get
+		{
+			switch (index)
+			{
+				case 0: return neighbouringSpline0;
+				case 1: return neighbouringSpline1;
+				case 2: return neighbouringSpline2;
+			};
+
+			throw new System.IndexOutOfRangeException();
+		}
+		set
+		{
+			switch (index)
+			{
+				case 0: neighbouringSpline0 = value; return;
+				case 1: neighbouringSpline1 = value; return;
+				case 2: neighbouringSpline2 = value; return;
+			};
+
+			throw new System.IndexOutOfRangeException();
+		}
+	}
+}
+
+public struct TrackSplineElementData : IBufferElementData
+{
+	public int startIntersection;
+	public float3 startPoint;
+	public int3 startNormal;
+	public int3 startTangent;
+	public int endIntersection;
+	public float3 endPoint;
+	public int3 endNormal;
+	public int3 endTangent;
+	public float3 anchor1;
+	public float3 anchor2;
+	public int maxCarCount;
+	public float measuredLength;
+	public float carQueueSize;
+}
+
+[RequiresEntityConversion]
+public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
+{
 	public int voxelCount=60;
 	public float voxelSize = 1f;
 	public int trisPerMesh = 4000;
@@ -41,6 +98,63 @@ public class RoadGenerator:MonoBehaviour {
 
 	MaterialPropertyBlock carMatProps;
 	List<List<Vector4>> carColors;
+
+	void IConvertGameObjectToEntity.Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
+    {
+		SpawnRoads();
+		GenerateRenderingData();
+
+		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
+		intersectionBuffer.Reserve(intersections.Count);
+
+		foreach (var intersection in intersections)
+		{
+			var intersectionElement = new IntersectionElementData()
+			{
+				position = intersection.position,
+				normal = intersection.normal,
+				neighbouringSpline0 = -1,
+				neighbouringSpline1 = -1,
+				neighbouringSpline2 = -1,
+			};
+
+			for (var j = 0; j < intersection.neighborSplines.Count; ++j)
+				intersectionElement[j] = trackSplines.IndexOf(intersection.neighborSplines[j]);
+
+			intersectionBuffer.Add(intersectionElement);
+		}
+
+		var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
+		trackSplineBuffer.Reserve(trackSplines.Count);
+
+		foreach (var trackSpline in trackSplines)
+		{
+			var trackSplineElement = new TrackSplineElementData()
+			{
+				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
+				startPoint = trackSpline.startPoint,
+				endPoint = trackSpline.endPoint,
+				anchor1 = trackSpline.anchor1,
+				anchor2 = trackSpline.anchor2,
+				measuredLength = trackSpline.measuredLength,
+				maxCarCount = trackSpline.maxCarCount,
+				carQueueSize = trackSpline.carQueueSize
+			};
+
+			var v = trackSpline.startNormal;
+			trackSplineElement.startNormal = new int3(v.x, v.y, v.z);
+			v = trackSpline.startTangent;
+			trackSplineElement.startTangent = new int3(v.x, v.y, v.z);
+			v = trackSpline.endNormal;
+			trackSplineElement.endNormal = new int3(v.x, v.y, v.z);
+			v = trackSpline.endTangent;
+			trackSplineElement.endTangent = new int3(v.x, v.y, v.z);
+
+			trackSplineBuffer.Add(trackSplineElement);
+		}
+
+		SpawnCars();
+	}
 
 	long HashIntersectionPair(Intersection a, Intersection b) {
 		// pack two intersections' IDs into one int64
@@ -114,7 +228,8 @@ public class RoadGenerator:MonoBehaviour {
 		}
 	}
 
-	void Start() {
+	void SpawnRoads() {
+
 		// cardinal directions:
 		dirs = new Vector3Int[] { new Vector3Int(1,0,0),new Vector3Int(-1,0,0),new Vector3Int(0,1,0),new Vector3Int(0,-1,0),new Vector3Int(0,0,1),new Vector3Int(0,0,-1) };
 
@@ -131,10 +246,7 @@ public class RoadGenerator:MonoBehaviour {
 				}
 			}
 		}
-		StartCoroutine(SpawnRoads());
-	}
 
-	IEnumerator SpawnRoads() {
 		// first generation pass: plan roads as basic voxel data only
 		trackVoxels = new bool[voxelCount,voxelCount,voxelCount];
 		List<Vector3Int> activeVoxels = new List<Vector3Int>();
@@ -162,9 +274,9 @@ public class RoadGenerator:MonoBehaviour {
 		int ticker = 0;
 		while (activeVoxels.Count>0 && ticker<50000) {
 			ticker++;
-			int index = Random.Range(0,activeVoxels.Count);
+			int index = UnityEngine.Random.Range(0,activeVoxels.Count);
 			Vector3Int pos = activeVoxels[index];
-			Vector3Int dir = dirs[Random.Range(0,dirs.Length)];
+			Vector3Int dir = dirs[UnityEngine.Random.Range(0,dirs.Length)];
 			Vector3Int pos2 = new Vector3Int(pos.x + dir.x,pos.y + dir.y,pos.z + dir.z);
 			if (GetVoxel(pos2) == false) {
 				// when placing a new voxel, it must have fewer than three
@@ -186,10 +298,6 @@ public class RoadGenerator:MonoBehaviour {
 				intersections.Add(intersection);
 				intersectionsGrid[pos.x,pos.y,pos.z] = intersection;
 				activeVoxels.RemoveAt(index);
-			}
-
-			if (ticker%1000==0) {
-				yield return null;
 			}
 		}
 
@@ -237,7 +345,7 @@ public class RoadGenerator:MonoBehaviour {
 				if (axesWithNeighbors[j]==0) {
 					if (intersection.normal == Vector3Int.zero) {
 						intersection.normal = new Vector3Int();
-						intersection.normal[j] = -1+Random.Range(0,2)*2;
+						intersection.normal[j] = -1+UnityEngine.Random.Range(0,2)*2;
 						//Debug.DrawRay(intersection.position,(Vector3)intersection.normal * .5f,Color.red,1000f);
 					} else {
 						Debug.LogError("a straight line has been marked as an intersection!");
@@ -257,15 +365,13 @@ public class RoadGenerator:MonoBehaviour {
 			// neighbors during the voxel phase, with two of their neighbor chains leading
 			// to nothing. these "hanging chains" are not included as splines, so the
 			// dead-ends that we see are actually "T" shapes with the top two segments hidden.
-
-			if (i%20==0) {
-				yield return null;
-			}
 		}
 
 		Debug.Log(trackSplines.Count + " road splines");
+	}
 
-
+	void GenerateRenderingData()
+	{
 		// generate road meshes
 
 		List<Vector3> vertices = new List<Vector3>();
@@ -295,10 +401,6 @@ public class RoadGenerator:MonoBehaviour {
 				uvs.Clear();
 				triangles.Clear();
 			}
-
-			if (i%10==0) {
-				yield return null;
-			}
 		}
 
 		// generate intersection matrices for batch-rendering
@@ -313,24 +415,26 @@ public class RoadGenerator:MonoBehaviour {
 		}
 
 		Debug.Log(triCount + " road triangles ("+roadMeshes.Count+" meshes)");
+	}
 
-
+	void SpawnCars()
+	{
 		// spawn cars
 
-		batch = 0;
+		var batch = 0;
 		for (int i = 0; i < 4000; i++) {
 			Car car = new Car();
 			car.maxSpeed = carSpeed;
-			car.roadSpline = trackSplines[Random.Range(0,trackSplines.Count)];
+			car.roadSpline = trackSplines[UnityEngine.Random.Range(0,trackSplines.Count)];
 			car.splineTimer = 1f;
-			car.splineDirection = -1 + Random.Range(0,2) * 2;
-			car.splineSide = -1 + Random.Range(0,2) * 2;
+			car.splineDirection = -1 + UnityEngine.Random.Range(0,2) * 2;
+			car.splineSide = -1 + UnityEngine.Random.Range(0,2) * 2;
 
 			car.roadSpline.GetQueue(car.splineDirection,car.splineSide).Add(car);
 
 			cars.Add(car);
 			carMatrices[batch].Add(Matrix4x4.identity);
-			carColors[batch].Add(Random.ColorHSV());
+			carColors[batch].Add(UnityEngine.Random.ColorHSV());
 			if (carMatrices[batch].Count == instancesPerBatch) {
 				carMatrices.Add(new List<Matrix4x4>());
 				carColors.Add(new List<Vector4>());
