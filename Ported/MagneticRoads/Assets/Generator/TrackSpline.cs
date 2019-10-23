@@ -197,7 +197,7 @@ public class TrackSpline{
 	}
 
 	public void DrawGizmos() {
-		Gizmos.color = Color.blue;
+		Gizmos.color = UnityEngine.Color.blue;
 
 		for (int j = -1; j <= 1; j++) {
 			Vector2 localPos = new Vector2(j * RoadGenerator.trackRadius,0f);

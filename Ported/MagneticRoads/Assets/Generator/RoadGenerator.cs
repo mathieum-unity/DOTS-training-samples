@@ -1,9 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Transforms;
+using Unity.Rendering;
+using UnityEngine.Rendering;
 
 [RequireComponent(typeof(ConvertToEntity))]
 [RequiresEntityConversion]
@@ -13,10 +17,8 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	public float voxelSize = 1f;
 	public int trisPerMesh = 4000;
 	public Material roadMaterial;
-	public Mesh intersectionMesh;
-	public Mesh intersectionPreviewMesh;
-	public Mesh carMesh;
 	public Material carMaterial;
+	public Mesh intersectionMesh;
 	public float carSpeed=2f;
 
 	bool[,,] trackVoxels;
@@ -45,7 +47,6 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	void IConvertGameObjectToEntity.Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
     {
 		SpawnRoads();
-		GenerateRenderingData();
 
 		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
 		intersectionBuffer.Reserve(intersections.Count);
@@ -97,7 +98,94 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			trackSplineBuffer.Add(trackSplineElement);
 		}
-	}
+	    
+	    // Etienne: add rendering entities for graph elements
+
+	    List<Vector3> mergedVertices = new List<Vector3>();
+	    List<Vector2> mergedUvs = new List<Vector2>();
+	    List<int> mergedTriangles = new List<int>();
+	    
+	    List<Vector3> splineVertices = new List<Vector3>();
+	    List<Vector2> splineUvs = new List<Vector2>();
+	    List<int> splineTriangles = new List<int>();
+	    
+	    List<Mesh> mergedRoadGeometries = new List<Mesh>();
+	    var triCount = 0;
+
+	    foreach (var trackSpline in trackSplines)
+	    {
+		    splineVertices.Clear();
+		    splineUvs.Clear();
+		    splineTriangles.Clear();
+		    trackSpline.GenerateMesh(splineVertices, splineUvs, splineTriangles);
+
+			// start a new mesh
+		    if (triCount + splineTriangles.Count > trisPerMesh)
+		    {
+			    var mesh = new Mesh();
+			    mesh.vertices = mergedVertices.ToArray();
+			    mesh.uv = mergedUvs.ToArray();
+			    mesh.triangles = mergedTriangles.ToArray();
+			    mergedRoadGeometries.Add(mesh);
+			    
+			    mergedVertices.Clear();
+			    mergedUvs.Clear();
+			    mergedTriangles.Clear();
+			    triCount = 0;
+		    }
+		    else
+		    {
+			    triCount += splineTriangles.Count;
+			    mergedVertices.AddRange(splineVertices);
+			    mergedUvs.AddRange(splineUvs);
+			    mergedTriangles.AddRange(splineTriangles);
+		    }
+	    }
+	    
+	    var lastMesh = new Mesh();
+	    lastMesh.vertices = mergedVertices.ToArray();
+	    lastMesh.uv = mergedUvs.ToArray();
+	    lastMesh.triangles = mergedTriangles.ToArray();
+	    mergedRoadGeometries.Add(lastMesh);
+	    
+	    var renderable = dstManager.CreateArchetype(typeof(MeshRenderer), typeof(MeshFilter), typeof(LocalToWorld));
+	    foreach (var mesh in mergedRoadGeometries)
+	    {
+		    var e = dstManager.CreateEntity(renderable);
+		    dstManager.AddComponentData(e, new LocalToWorld
+		    {
+			    Value = float4x4.identity
+		    });
+		    dstManager.SetComponentData(e, new RenderMesh
+		    {
+			    mesh = mesh,
+			    castShadows = ShadowCastingMode.On,
+			    layer = 0,
+			    material = roadMaterial,
+			    receiveShadows = true,
+			    subMesh = 0
+		    });
+	    }
+
+	    var index = 0;
+	    foreach (var intersection in intersections)
+	    {
+		    var e = dstManager.CreateEntity(renderable);
+		    dstManager.AddComponentData(e, new LocalToWorld
+		    {
+			    Value = intersection.GetMatrix()
+		    });
+		    dstManager.SetComponentData(e, new RenderMesh
+		    {
+			    mesh = intersectionMesh,
+			    castShadows = ShadowCastingMode.On,
+			    layer = 0,
+			    material = roadMaterial,
+			    receiveShadows = true,
+			    subMesh = 0
+		    });
+	    }
+    }
 
 	long HashIntersectionPair(Intersection a, Intersection b) {
 		// pack two intersections' IDs into one int64
