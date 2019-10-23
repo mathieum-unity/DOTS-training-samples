@@ -156,7 +156,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		    {
 			    Value = float4x4.identity
 		    });
-		    dstManager.SetComponentData(e, new RenderMesh
+		    dstManager.SetSharedComponentData(e, new RenderMesh
 		    {
 			    mesh = mesh,
 			    castShadows = ShadowCastingMode.On,
@@ -168,6 +168,16 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	    }
 
 	    var index = 0;
+
+	    var intersectionRenderMesh = new RenderMesh
+	    {
+		    mesh = intersectionMesh,
+		    castShadows = ShadowCastingMode.On,
+		    layer = 0,
+		    material = roadMaterial,
+		    receiveShadows = true,
+		    subMesh = 0
+	    };
 	    foreach (var intersection in intersections)
 	    {
 		    var e = dstManager.CreateEntity(renderable);
@@ -175,15 +185,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		    {
 			    Value = intersection.GetMatrix()
 		    });
-		    dstManager.SetComponentData(e, new RenderMesh
-		    {
-			    mesh = intersectionMesh,
-			    castShadows = ShadowCastingMode.On,
-			    layer = 0,
-			    material = roadMaterial,
-			    receiveShadows = true,
-			    subMesh = 0
-		    });
+		    dstManager.SetSharedComponentData(e, intersectionRenderMesh);
 	    }
     }
 
