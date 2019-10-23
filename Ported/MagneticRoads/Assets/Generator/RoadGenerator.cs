@@ -70,18 +70,19 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 		foreach (var intersection in intersections)
 		{
+			var neighbourCount = intersection.neighborSplines.Count;
+
 			var intersectionElement = new IntersectionElementData()
 			{
 				position = intersection.position,
+				normal = (Vector3)intersection.normal,
 				neighbouringSpline0 = -1,
 				neighbouringSpline1 = -1,
 				neighbouringSpline2 = -1,
+				neighbourCount = neighbourCount
 			};
 
-			var v = intersection.normal;
-			intersectionElement.normal = new int3(v.x, v.y, v.z);
-
-			for (var j = 0; j < intersection.neighborSplines.Count; ++j)
+			for (var j = 0; j < neighbourCount; ++j)
 				intersectionElement[j] = trackSplines.IndexOf(intersection.neighborSplines[j]);
 
 			intersectionBuffer.Add(intersectionElement);
@@ -96,22 +97,18 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			{
 				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
 				startPoint = trackSpline.startPoint,
+				startNormal = (Vector3)trackSpline.startNormal,
+				startTangent = (Vector3)trackSpline.startTangent,
 				endPoint = trackSpline.endPoint,
+				endNormal = (Vector3)trackSpline.endNormal,
+				endTangent = (Vector3)trackSpline.endTangent,
 				anchor1 = trackSpline.anchor1,
 				anchor2 = trackSpline.anchor2,
 				measuredLength = trackSpline.measuredLength,
 				maxCarCount = trackSpline.maxCarCount,
-				carQueueSize = trackSpline.carQueueSize
+				carQueueSize = trackSpline.carQueueSize,
+				twistMode = trackSpline.twistMode
 			};
-
-			var v = trackSpline.startNormal;
-			trackSplineElement.startNormal = new int3(v.x, v.y, v.z);
-			v = trackSpline.startTangent;
-			trackSplineElement.startTangent = new int3(v.x, v.y, v.z);
-			v = trackSpline.endNormal;
-			trackSplineElement.endNormal = new int3(v.x, v.y, v.z);
-			v = trackSpline.endTangent;
-			trackSplineElement.endTangent = new int3(v.x, v.y, v.z);
 
 			trackSplineBuffer.Add(trackSplineElement);
 		}

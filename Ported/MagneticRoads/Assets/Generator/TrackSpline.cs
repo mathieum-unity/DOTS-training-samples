@@ -21,7 +21,7 @@ public class TrackSpline{
 	public float carQueueSize;
 	public int maxCarCount;
 
-	int twistMode;
+	public int twistMode;
 
 	int errorCount;
 

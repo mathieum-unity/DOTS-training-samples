@@ -101,10 +101,10 @@ public struct BezierData : IComponentData
 	public float3 anchor1;
 	public float3 anchor2;
 	public float3 endPoint;   
-	public int3 startNormal;
-	public int3 endNormal;
-	public int3 startTangent;
-	public int3 endTangent;
+	public float3 startNormal;
+	public float3 endNormal;
+	public float3 startTangent;
+	public float3 endTangent;
 }
 
 public struct SplineLength : IComponentData

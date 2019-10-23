@@ -21,16 +21,17 @@ public struct InIntersection : IComponentData
 
 public struct Next : IComponentData
 {
-    public Entity value;
+    public Entity Value;
 }
 
 public struct IntersectionElementData : IBufferElementData
 {
 	public float3 position;
-	public int3 normal;
+	public float3 normal;
 	public int neighbouringSpline0;
 	public int neighbouringSpline1;
 	public int neighbouringSpline2;
+    public int neighbourCount;
 
 	public int this[int index]
 	{
@@ -57,6 +58,14 @@ public struct IntersectionElementData : IBufferElementData
 			throw new System.IndexOutOfRangeException();
 		}
 	}
+
+    public int IndexOf(int value)
+    {
+        for (var i = 0; i < neighbourCount; ++i)
+            if (this[i] == value) return i;
+
+        return -1;
+    }
 }
 
 public struct IntersectionStateElementData : IBufferElementData
@@ -93,17 +102,18 @@ public struct TrackSplineElementData : IBufferElementData
 {
 	public int startIntersection;
 	public float3 startPoint;
-	public int3 startNormal;
-	public int3 startTangent;
+	public float3 startNormal;
+	public float3 startTangent;
 	public int endIntersection;
 	public float3 endPoint;
-	public int3 endNormal;
-	public int3 endTangent;
+	public float3 endNormal;
+	public float3 endTangent;
 	public float3 anchor1;
 	public float3 anchor2;
 	public int maxCarCount;
 	public float measuredLength;
 	public float carQueueSize;
+    public int twistMode;
 }
 
 /*public struct RoadComponent : IComponentData
@@ -145,6 +155,71 @@ public struct TrackSplineStateElementData : IBufferElementData
     public Entity lastEntity1;
     public Entity lastEntity2;
     public Entity lastEntity3;
+
+    int GetLaneIndex(int splineSide, int splineDirection)
+    {
+        return (splineDirection > 0 ? 0 : 1) + (splineSide > 0 ? 0 : 2);
+    }
+    
+    public int GetCarCount(int splineSide, int splineDirection)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: return carCount0;
+            case 1: return carCount1;
+            case 2: return carCount2;
+            case 3: return carCount3;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
+
+    public void SetCarCount(int splineSide, int splineDirection, int value)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: carCount0 = value; return;
+            case 1: carCount1 = value; return;
+            case 2: carCount2 = value; return;
+            case 3: carCount3 = value; return;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
+
+    public Entity GetLastEntity(int splineSide, int splineDirection)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: return lastEntity0;
+            case 1: return lastEntity1;
+            case 2: return lastEntity2;
+            case 3: return lastEntity3;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
+
+    public void SetLastEntity(int splineSide, int splineDirection, Entity value)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: lastEntity0 = value; return;
+            case 1: lastEntity1 = value; return;
+            case 2: lastEntity2 = value; return;
+            case 3: lastEntity3 = value; return;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
 }
 
 public struct IntersectionHandle : IComponentData
