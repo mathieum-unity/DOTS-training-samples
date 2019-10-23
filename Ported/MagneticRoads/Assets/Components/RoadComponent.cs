@@ -2,6 +2,28 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
+public struct Lane : IComponentData
+{
+    public int splineDirection;
+    public int splineSide;
+    public int trackSplineIndex;
+}
+
+public struct NormalizedSpeed : IComponentData
+{
+    public float Value;
+}
+
+public struct InIntersection : IComponentData
+{
+
+}
+
+public struct Next : IComponentData
+{
+    public Entity value;
+}
+
 public struct IntersectionElementData : IBufferElementData
 {
 	public float3 position;
@@ -37,6 +59,36 @@ public struct IntersectionElementData : IBufferElementData
 	}
 }
 
+public struct IntersectionStateElementData : IBufferElementData
+{
+    public bool occupied0;
+    public bool occupied1;
+
+    public bool this[int index]
+    {
+        get
+        {
+            switch (index)
+            {
+                case 0: return occupied0;
+                case 1: return occupied1;
+            }
+
+            throw new System.IndexOutOfRangeException();
+        }
+        set
+        {
+            switch (index)
+            {
+                case 0: occupied0 = value; return;
+                case 1: occupied1 = value; return;
+            }
+
+            throw new System.IndexOutOfRangeException();
+        }
+    }
+}
+
 public struct TrackSplineElementData : IBufferElementData
 {
 	public int startIntersection;
@@ -56,7 +108,7 @@ public struct TrackSplineElementData : IBufferElementData
 
 public struct RoadComponent : IComponentData
 {
-    public Entity edge; // a road corresponds to a graph edge
+    public int trackSplineIndex;
     
     public NativeList<Entity> topLeftLane;
     public NativeList<Entity> topRightLane;
@@ -83,6 +135,18 @@ public struct RoadComponent : IComponentData
     }
 }
 
+public struct TrackSplineStateElementData : IBufferElementData
+{
+    public int carCount0;
+    public int carCount1;
+    public int carCount2;
+    public int carCount3;
+    public Entity lastEntity0;
+    public Entity lastEntity1;
+    public Entity lastEntity2;
+    public Entity lastEntity3;
+}
+
 public struct IntersectionHandle : IComponentData
 {
     public Entity Value;
@@ -96,29 +160,6 @@ public struct Edge : IComponentData
 public struct Node : IComponentData
 {
     public int start, end;
-}
-
-
-
-
-public struct Velocity : IComponentData
-{
-    public float Value;
-}
-
-public struct LaneIndex : IComponentData
-{
-    public byte Value;
-
-    public bool IsLeft => (Value & 1) == 0;
-}
-
-// purpose: group car entities in chunks according to their lanes / roads
-// cars that belong to the same lane should be nearby in memory
-public struct Lane : ISharedComponentData
-{
-    public Entity road;
-    public int laneIndex;
 }
 
 public class Somewhere

@@ -48,6 +48,18 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
     {
 		SpawnRoads();
 
+		var intersectionStateBuffer = dstManager.AddBuffer<IntersectionStateElementData>(entity);
+		intersectionStateBuffer.Reserve(intersections.Count);
+
+		foreach (var intersection in intersections)
+			intersectionStateBuffer.Add(new IntersectionStateElementData());
+
+		var trackSplineStateBuffer = dstManager.AddBuffer<TrackSplineStateElementData>(entity);
+		trackSplineStateBuffer.Reserve(trackSplines.Count);
+
+		foreach (var trackSpline in trackSplines)
+			trackSplineStateBuffer.Add(new TrackSplineStateElementData());
+		
 		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
 		intersectionBuffer.Reserve(intersections.Count);
 
@@ -166,8 +178,6 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			    subMesh = 0
 		    });
 	    }
-
-	    var index = 0;
 
 	    var intersectionRenderMesh = new RenderMesh
 	    {
