@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Security.Cryptography;
 using TMPro;
 using UnityEngine;
 using Unity.Collections;
@@ -25,6 +26,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	public Mesh carMesh;
 	public float carSpeed=2f;
 	public int numCars;
+	public int maxGenerationTicks = 500000;
 
 	bool[,,] trackVoxels;
 	List<Intersection> intersections;
@@ -87,8 +89,13 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			intersectionBuffer.Add(intersectionElement);
 		}
+	    
+	    // Etienne: add rendering entities for graph elements
+	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
+	    SpawnRoadRenderables(dstManager, renderable);
+	    SpawnIntersectionRenderables(dstManager, renderable);
 
-		var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
+	    var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
 		trackSplineBuffer.Reserve(trackSplines.Count);
 
 		foreach (var trackSpline in trackSplines)
@@ -96,14 +103,17 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			var trackSplineElement = new TrackSplineElementData()
 			{
 				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
-				startPoint = trackSpline.startPoint,
-				startNormal = (Vector3)trackSpline.startNormal,
-				startTangent = (Vector3)trackSpline.startTangent,
-				endPoint = trackSpline.endPoint,
-				endNormal = (Vector3)trackSpline.endNormal,
-				endTangent = (Vector3)trackSpline.endTangent,
-				anchor1 = trackSpline.anchor1,
-				anchor2 = trackSpline.anchor2,
+				curve = new BezierData()
+				{
+					startPoint = trackSpline.startPoint,
+					startNormal = (Vector3)trackSpline.startNormal,
+					startTangent = (Vector3)trackSpline.startTangent,
+					endPoint = trackSpline.endPoint,
+					endNormal = (Vector3)trackSpline.endNormal,
+					endTangent = (Vector3)trackSpline.endTangent,
+					anchor1 = trackSpline.anchor1,
+					anchor2 = trackSpline.anchor2
+				},
 				measuredLength = trackSpline.measuredLength,
 				maxCarCount = trackSpline.maxCarCount,
 				carQueueSize = trackSpline.carQueueSize,
@@ -113,12 +123,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			trackSplineBuffer.Add(trackSplineElement);
 		}
 	    
-	    // Etienne: add rendering entities for graph elements
-	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
-	    SpawnRoadRenderables(dstManager, renderable);
-	    SpawnIntersectionRenderables(dstManager, renderable);
-	    
-	    SpawnCars(dstManager, numCars, trackSplines.Count);
+	    SpawnCars(dstManager, entity, numCars, trackSplines.Count);
     }
 
 	void SpawnRoadRenderables(EntityManager dstManager, EntityArchetype renderable)
@@ -194,42 +199,72 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	}
 
-	void SpawnCars(EntityManager dstManager, int carCout, int roadCount)
+	void SpawnCars(EntityManager dstManager, Entity entity, int carCount, int roadCount)
 	{
-		
+
 		var carArchetype = dstManager.CreateArchetype(
-			typeof(RenderMesh), 
-			typeof(LocalToWorld));
+			typeof(RenderMesh),
+			typeof(LocalToWorld),
+			typeof(SplineT), 
+			typeof(SplineSideDirection), 
+			typeof(BezierData),
+			typeof(Translation),
+			typeof(NonUniformScale),
+			typeof(Rotation));
 
 		
-		var carRenderMesh = new RenderMesh
+		var materials = new List<Material>();
+		for (int i = 0; i != 64; ++i)
 		{
-			mesh = carMesh,
-			castShadows = ShadowCastingMode.On,
-			layer = 0,
-			material = carMaterial,
-			receiveShadows = true,
-			subMesh = 0
-		};
-		
-		// car initialization data
-		var colors = new List<float3>(); 
-		var roadIndices = new List<int>();
-		var lanes = new List<byte>();
-		var velocities = new List<float>();
-		var times = new List<float>();
+			var m = new Material(carMaterial);
+			m.color = UnityEngine.Random.ColorHSV();
+			materials.Add(m);
+		}
 
-		InitializeCars(carCout, roadCount, colors, roadIndices, lanes, velocities, times);
+		int count = carCount;
+		var random = new Random(0x6E624EB7u);
 		
+		var maxCarsPerRoad = (int)math.ceil(count / (float)roadCount);
+		int currentCarsOnRoad = 0;
+		int currentRoadIndex = 0;
 		
-		for (int i = 0; i <= carCout; ++i)
+		var roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+		var trackSpline = roads[currentRoadIndex];
+
+		for (int i = 0; i < count; ++i)
 		{
 			var e = dstManager.CreateEntity(carArchetype);
 			
 			// TODO set component data based on init data
-			
-			
-			dstManager.SetSharedComponentData(e, carRenderMesh);
+			// SplineT, BezierData, SplineSideDirection, Translation, Rotation
+			dstManager.SetComponentData(e, new SplineT(){Value = random.NextFloat(.0f, .8f)});
+			dstManager.SetComponentData(e, new SplineSideDirection()
+			{
+				DirectionValue = (byte)((i%2)*2),
+				SideValue = (byte)(((i>>1)%2)*2)
+			});
+
+			dstManager.SetComponentData(e, new NonUniformScale { Value = new float3(0.1f, 0.08f,0.12f) });
+			dstManager.SetComponentData(e, trackSpline.curve);
+			dstManager.SetSharedComponentData(e, new RenderMesh
+				{
+					mesh = carMesh,
+					castShadows = ShadowCastingMode.On,
+					layer = 0,
+					material = materials[random.NextInt(materials.Count)],
+					receiveShadows = true,
+					subMesh = 0
+				});
+
+			currentCarsOnRoad++;
+
+			if (currentCarsOnRoad >= maxCarsPerRoad)
+			{
+				currentCarsOnRoad = 0;
+				currentRoadIndex++;
+				roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+				trackSpline = roads[currentRoadIndex];
+			}
 		}
 	}
 
@@ -371,7 +406,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 		// plan roads broadly: first, as a grid of true/false voxels
 		int ticker = 0;
-		while (activeVoxels.Count>0 && ticker<50000) {
+		while (activeVoxels.Count>0 && ticker<maxGenerationTicks) {
 			ticker++;
 			int index = UnityEngine.Random.Range(0,activeVoxels.Count);
 			Vector3Int pos = activeVoxels[index];

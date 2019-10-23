@@ -101,15 +101,8 @@ public struct IntersectionStateElementData : IBufferElementData
 public struct TrackSplineElementData : IBufferElementData
 {
 	public int startIntersection;
-	public float3 startPoint;
-	public float3 startNormal;
-	public float3 startTangent;
-	public int endIntersection;
-	public float3 endPoint;
-	public float3 endNormal;
-	public float3 endTangent;
-	public float3 anchor1;
-	public float3 anchor2;
+    public int endIntersection;
+	public BezierData curve;
 	public int maxCarCount;
 	public float measuredLength;
 	public float carQueueSize;

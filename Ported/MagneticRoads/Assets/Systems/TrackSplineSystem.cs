@@ -10,7 +10,7 @@ using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
 // TODO execute before spline evaluation system
-[UpdateInGroup(typeof(LateSimulationSystemGroup))]
+[UpdateInGroup(typeof(SimulationSystemGroup))]
 public class TrackSplineSystem : ComponentSystem
 {
     static readonly float maxSpeed = 2f;
@@ -29,7 +29,7 @@ public class TrackSplineSystem : ComponentSystem
 
     protected override void OnUpdate()
     {
-        var entities = m_Query.ToEntityArray(Allocator.Temp);
+        var entities = m_Query.ToEntityArray(Allocator.TempJob);
 
         Debug.Assert(entities.Length == 1);
 
@@ -191,13 +191,13 @@ public class TrackSplineSystem : ComponentSystem
                     if (nextTrackSpline.startIntersection == intersectionIndex)
                     {
                         lane.splineDirection = 1;
-                        newNormal = nextTrackSpline.startNormal;
+                        newNormal = nextTrackSpline.curve.startNormal;
                         //intersectionSpline.endPoint = newSpline.startPoint;
                     }
                     else
                     {
                         lane.splineDirection = -1;
-                        newNormal = nextTrackSpline.endNormal;
+                        newNormal = nextTrackSpline.curve.endNormal;
                         //intersectionSpline.endPoint = newSpline.endPoint;
                     }
 
@@ -282,19 +282,7 @@ public class TrackSplineSystem : ComponentSystem
                     occupied[(intersectionSide + 1) / 2] = false;
                     m_IntersectionStateBuffer[intersectionIndex] = occupied;
 
-                    var newBezierData = new BezierData()
-                    {
-                        startPoint = nextTrackSpline.startPoint,
-                        anchor1 = nextTrackSpline.anchor1,
-                        anchor2 = nextTrackSpline.anchor2,
-                        endPoint = nextTrackSpline.endPoint,
-                        startNormal = nextTrackSpline.startNormal,
-                        endNormal = nextTrackSpline.endNormal,
-                        startTangent = nextTrackSpline.startTangent,
-                        endTangent = nextTrackSpline.endTangent
-                    };
-
-                    PostUpdateCommands.SetComponent<BezierData>(clone, newBezierData);
+                    PostUpdateCommands.SetComponent<BezierData>(clone, nextTrackSpline.curve);
                     PostUpdateCommands.SetComponent<Next>(clone, nextEntity);
                     PostUpdateCommands.DestroyEntity(e);
                 }

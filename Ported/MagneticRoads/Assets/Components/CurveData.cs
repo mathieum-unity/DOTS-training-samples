@@ -105,6 +105,7 @@ public struct BezierData : IComponentData
 	public float3 endNormal;
 	public float3 startTangent;
 	public float3 endTangent;
+	public int twistMode;
 }
 
 public struct SplineLength : IComponentData
@@ -128,3 +129,5 @@ public struct SplineSideDirection : IComponentData
 	public byte DirectionValue;
 	public byte SideValue;
 }
+
+public struct Disabled:IComponentData{}

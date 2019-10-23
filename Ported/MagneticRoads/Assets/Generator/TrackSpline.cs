@@ -28,6 +28,9 @@ public class TrackSpline{
 	public TrackSpline(Intersection start,Vector3 tangent1,Intersection end,Vector3 tangent2) {
 		startIntersection = start;
 		endIntersection = end;
+		startNormal = start.normal;
+		endNormal = end.normal;
+
 		startPoint = start.position + tangent1 * RoadGenerator.intersectionSize * .5f;
 		endPoint = end.position + tangent2 * RoadGenerator.intersectionSize * .5f;
 		

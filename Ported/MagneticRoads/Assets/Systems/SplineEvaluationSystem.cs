@@ -6,7 +6,8 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[UpdateInGroup(typeof(LateSimulationSystemGroup))]
+[UpdateInGroup(typeof(SimulationSystemGroup))]
+[UpdateAfter(typeof(TrackSplineSystem))]
 public class SplineEvaluationSystem : JobComponentSystem
 {
     public static float3 EvaluateBezier(float tValue, [ReadOnly] ref BezierData curve)
@@ -125,23 +126,23 @@ public class SplineEvaluationSystem : JobComponentSystem
             lyz = -left[1] * left[2];
             /* symmetric matrix */
             /*Get(0, 0)*/
-            result[0] = fxx + uxx + lxx;
+            result[0][0] = fxx + uxx + lxx;
             /*Get(0, 1)*/
-            result[1] = fxy + uxy + lxy;
+            result[0][1] = fxy + uxy + lxy;
             /*Get(0, 2)*/
-            result[2] = fxz + uxz + lxz;
+            result[0][2] = fxz + uxz + lxz;
             /*Get(1, 0)*/
-            result[3] = result[1]; //Get(0, 1);
+            result[1][0] = result[0][1]; //Get(0, 1);
             /*Get(1, 1)*/
-            result[4] = fyy + uyy + lyy;
+            result[1][1] = fyy + uyy + lyy;
             /*Get(1, 2)*/
-            result[5] = fyz + uyz + lyz;
+            result[1][2] = fyz + uyz + lyz;
             /*Get(2, 0)*/
-            result[6] = result[2]; //Get(0, 2);
+            result[2][0] = result[0][2]; //Get(0, 2);
             /*Get(2, 1)*/
-            result[7] = result[5]; //Get(1, 2);
+            result[2][1] = result[1][2]; //Get(1, 2);
             /*Get(2, 2)*/
-            result[8] = fzz + uzz + lzz;
+            result[2][2] = fzz + uzz + lzz;
             return result;
         }
         else /* the most common case, unless "from"="to", or "from"=-"to" */
@@ -157,23 +158,23 @@ public class SplineEvaluationSystem : JobComponentSystem
             hvxz = hvx * v[2];
             hvyz = hvz * v[1];
             /*Get(0, 0)*/
-            result[0] = e + hvx * v[0];
+            result[0][0] = e + hvx * v[0];
             /*Get(0, 1)*/
-            result[1] = hvxy - v[2];
+            result[0][1] = hvxy - v[2];
             /*Get(0, 2)*/
-            result[2] = hvxz + v[1];
+            result[0][2] = hvxz + v[1];
             /*Get(1, 0)*/
-            result[3] = hvxy + v[2];
+            result[1][0] = hvxy + v[2];
             /*Get(1, 1)*/
-            result[4] = e + h * v[1] * v[1];
+            result[1][1] = e + h * v[1] * v[1];
             /*Get(1, 2)*/
-            result[5] = hvyz - v[0];
+            result[1][2] = hvyz - v[0];
             /*Get(2, 0)*/
-            result[6] = hvxz - v[1];
+            result[2][0] = hvxz - v[1];
             /*Get(2, 1)*/
-            result[7] = hvyz + v[0];
+            result[2][1] = hvyz + v[0];
             /*Get(2, 2)*/
-            result[8] = e + hvz * v[2];
+            result[2][2] = e + hvz * v[2];
             return result;
         }
     }
@@ -196,20 +197,19 @@ public class SplineEvaluationSystem : JobComponentSystem
         // each spline uses one out of three possible twisting methods:
         quaternion fromTo = quaternion.identity;
 
-        int twistMode = 1;
 
-        if (twistMode == 0)
+        if (curve.twistMode == 0)
         {
             // method 1 - rotate startNormal around our current tangent
             float angle = SignedAngle(curve.startNormal, curve.endNormal, tangent);
             fromTo = quaternion.AxisAngle(tangent, angle);
         }
-        else if (twistMode == 1)
+        else if (curve.twistMode == 1)
         {
             // method 2 - rotate startNormal toward endNormal
             fromTo = fromToQuaternion(curve.startNormal, curve.endNormal);
         }
-        else if (twistMode == 2)
+        else if (curve.twistMode == 2)
         {
             // method 3 - rotate startNormal by "startOrientation-to-endOrientation" rotation
             quaternion startRotation = quaternion.LookRotation(curve.startTangent, curve.startNormal);
@@ -240,7 +240,7 @@ public class SplineEvaluationSystem : JobComponentSystem
     }
 
 
-    [BurstCompile]
+   // [BurstCompile]
     struct EvaluateSplineUpForward : IJobForEach<SplineT, BezierData, SplineSideDirection, Translation, Rotation>
     {
         public void Execute([ReadOnly] ref SplineT t,
@@ -251,15 +251,13 @@ public class SplineEvaluationSystem : JobComponentSystem
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 
-            float2 extrudePoint;
-
             float tValue = t.Value;
             if (direction == -1)
             {
                 tValue = 1f - tValue;
             }
 
-            extrudePoint = new Vector2(-RoadGenerator.trackRadius * .5f * side,
+            float2 extrudePoint = new Vector2(-RoadGenerator.trackRadius * .5f * direction*side,
                 RoadGenerator.trackThickness * .5f * side);
 
             // find our position and orientation
@@ -273,12 +271,35 @@ public class SplineEvaluationSystem : JobComponentSystem
         }
     }
 
+    struct UpdateT : IJobForEach<SplineT, SplineSideDirection>
+    {
+        public float deltaTime;
+        public void Execute(ref SplineT t,
+            ref SplineSideDirection dir
+        )
+        {
+            t.Value += deltaTime * 0.3f;
+
+            if (t.Value > 1)
+            {
+                t.Value = 0;
+                
+                int direction = ((int) dir.DirectionValue) - 1;
+                direction *= -1;
+                dir.DirectionValue = (byte)(direction + 1);
+            }
+        }
+    }
+
     protected override JobHandle OnUpdate(JobHandle inputDependencies)
     {
+        var updateT = new UpdateT() {deltaTime = Time.deltaTime};
+        var jobHandle = updateT.Schedule(this, inputDependencies);
+        
         var upForward = new EvaluateSplineUpForward();
-        var upForwardHandle = upForward.Schedule(this, inputDependencies);
+        jobHandle = upForward.Schedule(this, jobHandle);
 
-        return upForwardHandle;
+        return jobHandle;
 //        var posHandle = posJob.Schedule(this, upForwardHandle);
 //        return JobHandle.CombineDependencies(rotHandle, posHandle);
     }
