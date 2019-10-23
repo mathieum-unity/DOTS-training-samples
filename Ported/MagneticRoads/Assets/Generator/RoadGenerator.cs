@@ -95,33 +95,33 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			var trackSplineElement = new TrackSplineElementData()
 			{
 				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
-				startPoint = trackSpline.startPoint,
-				endPoint = trackSpline.endPoint,
-				anchor1 = trackSpline.anchor1,
-				anchor2 = trackSpline.anchor2,
+				curve = new BezierData()
+				{
+					startPoint = trackSpline.startPoint,
+					endPoint = trackSpline.endPoint,
+					anchor1 = trackSpline.anchor1,
+					anchor2 = trackSpline.anchor2,
+					startNormal = new int3(trackSpline.startNormal.x, trackSpline.startNormal.y,
+						trackSpline.startNormal.z),
+					endNormal = new int3(trackSpline.endNormal.x, trackSpline.endNormal.y, trackSpline.endNormal.z),
+					startTangent = new int3(trackSpline.startTangent.x, trackSpline.startTangent.y,
+						trackSpline.startTangent.z),
+					endTangent = new int3(trackSpline.endTangent.x, trackSpline.endTangent.y, trackSpline.endTangent.z),
+				},
 				measuredLength = trackSpline.measuredLength,
 				maxCarCount = trackSpline.maxCarCount,
 				carQueueSize = trackSpline.carQueueSize
 			};
 
-			var v = trackSpline.startNormal;
-			trackSplineElement.startNormal = new int3(v.x, v.y, v.z);
-			v = trackSpline.startTangent;
-			trackSplineElement.startTangent = new int3(v.x, v.y, v.z);
-			v = trackSpline.endNormal;
-			trackSplineElement.endNormal = new int3(v.x, v.y, v.z);
-			v = trackSpline.endTangent;
-			trackSplineElement.endTangent = new int3(v.x, v.y, v.z);
-
 			trackSplineBuffer.Add(trackSplineElement);
 		}
+	    
+		SpawnCars(dstManager, entity, numCars, trackSplines.Count);
 	    
 	    // Etienne: add rendering entities for graph elements
 	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
 	    SpawnRoadRenderables(dstManager, renderable);
 	    SpawnIntersectionRenderables(dstManager, renderable);
-	    
-	    SpawnCars(dstManager, numCars, trackSplines.Count);
     }
 
 	void SpawnRoadRenderables(EntityManager dstManager, EntityArchetype renderable)
@@ -197,12 +197,18 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	}
 
-	void SpawnCars(EntityManager dstManager, int carCout, int roadCount)
+	void SpawnCars(EntityManager dstManager, Entity entity, int carCout, int roadCount)
 	{
-		
+
 		var carArchetype = dstManager.CreateArchetype(
-			typeof(RenderMesh), 
-			typeof(LocalToWorld));
+			typeof(RenderMesh),
+			typeof(LocalToWorld),
+			typeof(SplineT), 
+			typeof(SplineSideDirection), 
+			typeof(BezierData),
+			typeof(Translation), 
+			typeof(Rotation), 
+			typeof(ColorData));
 
 		
 		var carRenderMesh = new RenderMesh
@@ -223,16 +229,46 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		var times = new List<float>();
 
 		InitializeCars(carCout, roadCount, colors, roadIndices, lanes, velocities, times);
+
+		int count = 4000;
+		var random = new Random(0x6E624EB7u);
 		
+		var maxCarsPerRoad = (int)math.ceil(count / (float)roadCount);
+		var createdCarCount = 0;
+
+		int currentCarsOnRoad = 0;
+		int currentRoadIndex = 0;
 		
-		for (int i = 0; i <= carCout; ++i)
+		var roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+		var trackSpline = roads[currentRoadIndex];
+
+		for (int i = 0; i < count; ++i)
 		{
 			var e = dstManager.CreateEntity(carArchetype);
 			
 			// TODO set component data based on init data
-			
-			
+			// SplineT, BezierData, SplineSideDirection, Translation, Rotation
+			dstManager.SetComponentData(e, new SplineT(){Value = random.NextFloat(.0f, .8f)});
+			dstManager.SetComponentData(e, new SplineSideDirection()
+			{
+				DirectionValue = (byte)((i%2)*2),
+				SideValue = (byte)(((i>>1)%2)*2)
+			});
+
+
+			dstManager.SetComponentData(e, trackSpline.curve);
+			dstManager.SetComponentData(e, new ColorData() {Value = random.NextFloat3()});
 			dstManager.SetSharedComponentData(e, carRenderMesh);
+
+			currentCarsOnRoad++;
+
+			if (currentCarsOnRoad >= maxCarsPerRoad)
+			{
+				currentCarsOnRoad = 0;
+				currentRoadIndex++;
+				roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+				trackSpline = roads[currentRoadIndex];
+			}
 		}
 	}
 

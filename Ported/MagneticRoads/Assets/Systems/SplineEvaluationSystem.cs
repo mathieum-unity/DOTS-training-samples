@@ -6,7 +6,8 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[UpdateInGroup(typeof(LateSimulationSystemGroup))]
+[UpdateInGroup(typeof(SimulationSystemGroup))]
+[UpdateAfter(typeof(TrackSplineSystem))]
 public class SplineEvaluationSystem : JobComponentSystem
 {
     public static float3 EvaluateBezier(float tValue, [ReadOnly] ref BezierData curve)
@@ -125,23 +126,23 @@ public class SplineEvaluationSystem : JobComponentSystem
             lyz = -left[1] * left[2];
             /* symmetric matrix */
             /*Get(0, 0)*/
-            result[0] = fxx + uxx + lxx;
+            result[0][0] = fxx + uxx + lxx;
             /*Get(0, 1)*/
-            result[1] = fxy + uxy + lxy;
+            result[0][1] = fxy + uxy + lxy;
             /*Get(0, 2)*/
-            result[2] = fxz + uxz + lxz;
+            result[0][2] = fxz + uxz + lxz;
             /*Get(1, 0)*/
-            result[3] = result[1]; //Get(0, 1);
+            result[1][0] = result[0][1]; //Get(0, 1);
             /*Get(1, 1)*/
-            result[4] = fyy + uyy + lyy;
+            result[1][1] = fyy + uyy + lyy;
             /*Get(1, 2)*/
-            result[5] = fyz + uyz + lyz;
+            result[1][2] = fyz + uyz + lyz;
             /*Get(2, 0)*/
-            result[6] = result[2]; //Get(0, 2);
+            result[2][0] = result[0][2]; //Get(0, 2);
             /*Get(2, 1)*/
-            result[7] = result[5]; //Get(1, 2);
+            result[2][1] = result[1][2]; //Get(1, 2);
             /*Get(2, 2)*/
-            result[8] = fzz + uzz + lzz;
+            result[2][2] = fzz + uzz + lzz;
             return result;
         }
         else /* the most common case, unless "from"="to", or "from"=-"to" */
@@ -157,23 +158,23 @@ public class SplineEvaluationSystem : JobComponentSystem
             hvxz = hvx * v[2];
             hvyz = hvz * v[1];
             /*Get(0, 0)*/
-            result[0] = e + hvx * v[0];
+            result[0][0] = e + hvx * v[0];
             /*Get(0, 1)*/
-            result[1] = hvxy - v[2];
+            result[0][1] = hvxy - v[2];
             /*Get(0, 2)*/
-            result[2] = hvxz + v[1];
+            result[0][2] = hvxz + v[1];
             /*Get(1, 0)*/
-            result[3] = hvxy + v[2];
+            result[1][0] = hvxy + v[2];
             /*Get(1, 1)*/
-            result[4] = e + h * v[1] * v[1];
+            result[1][1] = e + h * v[1] * v[1];
             /*Get(1, 2)*/
-            result[5] = hvyz - v[0];
+            result[1][2] = hvyz - v[0];
             /*Get(2, 0)*/
-            result[6] = hvxz - v[1];
+            result[2][0] = hvxz - v[1];
             /*Get(2, 1)*/
-            result[7] = hvyz + v[0];
+            result[2][1] = hvyz + v[0];
             /*Get(2, 2)*/
-            result[8] = e + hvz * v[2];
+            result[2][2] = e + hvz * v[2];
             return result;
         }
     }
@@ -198,24 +199,24 @@ public class SplineEvaluationSystem : JobComponentSystem
 
         int twistMode = 1;
 
-        if (twistMode == 0)
-        {
-            // method 1 - rotate startNormal around our current tangent
-            float angle = SignedAngle(curve.startNormal, curve.endNormal, tangent);
-            fromTo = quaternion.AxisAngle(tangent, angle);
-        }
-        else if (twistMode == 1)
-        {
-            // method 2 - rotate startNormal toward endNormal
-            fromTo = fromToQuaternion(curve.startNormal, curve.endNormal);
-        }
-        else if (twistMode == 2)
-        {
-            // method 3 - rotate startNormal by "startOrientation-to-endOrientation" rotation
-            quaternion startRotation = quaternion.LookRotation(curve.startTangent, curve.startNormal);
-            quaternion endRotation = quaternion.LookRotation(curve.endTangent * -1, curve.endNormal);
-            fromTo = math.mul(endRotation, math.inverse(startRotation));
-        }
+//        if (twistMode == 0)
+//        {
+//            // method 1 - rotate startNormal around our current tangent
+//            float angle = SignedAngle(curve.startNormal, curve.endNormal, tangent);
+//            fromTo = quaternion.AxisAngle(tangent, angle);
+//        }
+//        else if (twistMode == 1)
+//        {
+//            // method 2 - rotate startNormal toward endNormal
+//            fromTo = fromToQuaternion(curve.startNormal, curve.endNormal);
+//        }
+//        else if (twistMode == 2)
+//        {
+//            // method 3 - rotate startNormal by "startOrientation-to-endOrientation" rotation
+//            quaternion startRotation = quaternion.LookRotation(curve.startTangent, curve.startNormal);
+//            quaternion endRotation = quaternion.LookRotation(curve.endTangent * -1, curve.endNormal);
+//            fromTo = math.mul(endRotation, math.inverse(startRotation));
+//        }
 
         // other twisting methods can be added, but they need to
         // respect the relationship between startNormal and endNormal.
@@ -243,11 +244,16 @@ public class SplineEvaluationSystem : JobComponentSystem
     [BurstCompile]
     struct EvaluateSplineUpForward : IJobForEach<SplineT, BezierData, SplineSideDirection, Translation, Rotation>
     {
-        public void Execute([ReadOnly] ref SplineT t,
+        public void Execute(ref SplineT t,
             [ReadOnly] ref BezierData curve,
             [ReadOnly] ref SplineSideDirection dir,
             ref Translation position, ref Rotation rotation)
         {
+            t.Value += 0.001f;
+
+            if (t.Value > 1.0f)
+                t.Value = 0;
+            
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 

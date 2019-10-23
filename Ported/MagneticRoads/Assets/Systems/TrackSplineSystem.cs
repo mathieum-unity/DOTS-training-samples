@@ -9,7 +9,7 @@ using UnityEngine;
 using static Unity.Mathematics.math;
 
 // TODO execute before spline evaluation system
-[UpdateInGroup(typeof(LateSimulationSystemGroup))]
+[UpdateInGroup(typeof(SimulationSystemGroup))]
 public class TrackSplineSystem : ComponentSystem
 {
     static readonly float maxSpeed = 2f;
@@ -27,7 +27,7 @@ public class TrackSplineSystem : ComponentSystem
 
     protected override void OnUpdate()
     {
-        var entities = m_Query.ToEntityArray(Allocator.Temp);
+        var entities = m_Query.ToEntityArray(Allocator.TempJob);
 
         Debug.Assert(entities.Length == 1);
 
@@ -37,12 +37,12 @@ public class TrackSplineSystem : ComponentSystem
         m_IntersectionStateBuffer = EntityManager.GetBuffer<IntersectionStateElementData>(entities[0]);
         m_DeltaTime = Time.deltaTime;
 
-        Entities.WithNone<InIntersection>().ForEach((ref Lane lane, ref SplineT splineTimer, ref Next next, ref NormalizedSpeed normalizedSpeed) =>
-        {
-            Step1(ref lane, ref splineTimer, ref next, ref normalizedSpeed);
-            Step2(ref splineTimer);
-
-        });
+//        Entities.WithNone<InIntersection>().ForEach((ref Lane lane, ref SplineT splineTimer, ref Next next, ref NormalizedSpeed normalizedSpeed) =>
+//        {
+//            Step1(ref lane, ref splineTimer, ref next, ref normalizedSpeed);
+//            Step2(ref splineTimer);
+//
+//        });
 
         entities.Dispose();
     }

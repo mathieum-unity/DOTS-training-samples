@@ -128,3 +128,5 @@ public struct SplineSideDirection : IComponentData
 	public byte DirectionValue;
 	public byte SideValue;
 }
+
+public struct Disabled:IComponentData{}
