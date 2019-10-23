@@ -207,7 +207,8 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			typeof(SplineT), 
 			typeof(SplineSideDirection), 
 			typeof(BezierData),
-			typeof(Translation), 
+			typeof(Translation),
+			typeof(Scale),
 			typeof(Rotation), 
 			typeof(ColorData));
 
@@ -256,7 +257,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 				SideValue = (byte)(((i>>1)%2)*2)
 			});
 
-
+			dstManager.SetComponentData(e, new Scale { Value = 0.1f });
 			dstManager.SetComponentData(e, trackSpline.curve);
 			dstManager.SetComponentData(e, new ColorData() {Value = random.NextFloat3()});
 			dstManager.SetSharedComponentData(e, carRenderMesh);
