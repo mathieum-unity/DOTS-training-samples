@@ -248,11 +248,6 @@ public class SplineEvaluationSystem : JobComponentSystem
             [ReadOnly] ref SplineSideDirection dir,
             ref Translation position, ref Rotation rotation)
         {
-            t.Value += 0.001f;
-
-            if (t.Value > 1.0f)
-                t.Value = 0;
-            
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 
@@ -276,12 +271,35 @@ public class SplineEvaluationSystem : JobComponentSystem
         }
     }
 
+    struct UpdateT : IJobForEach<SplineT, SplineSideDirection>
+    {
+        public float deltaTime;
+        public void Execute(ref SplineT t,
+            ref SplineSideDirection dir
+        )
+        {
+            t.Value += deltaTime * 0.3f;
+
+            if (t.Value > 1)
+            {
+                t.Value = 0;
+                
+                int direction = ((int) dir.DirectionValue) - 1;
+                direction *= -1;
+                dir.DirectionValue = (byte)(direction + 1);
+            }
+        }
+    }
+
     protected override JobHandle OnUpdate(JobHandle inputDependencies)
     {
+        var updateT = new UpdateT() {deltaTime = Time.deltaTime};
+        var jobHandle = updateT.Schedule(this, inputDependencies);
+        
         var upForward = new EvaluateSplineUpForward();
-        var upForwardHandle = upForward.Schedule(this, inputDependencies);
+        jobHandle = upForward.Schedule(this, jobHandle);
 
-        return upForwardHandle;
+        return jobHandle;
 //        var posHandle = posJob.Schedule(this, upForwardHandle);
 //        return JobHandle.CombineDependencies(rotHandle, posHandle);
     }
