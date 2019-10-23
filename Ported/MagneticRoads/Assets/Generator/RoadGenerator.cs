@@ -26,6 +26,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	public Mesh carMesh;
 	public float carSpeed=2f;
 	public int numCars;
+	public int maxGenerationTicks = 500000;
 
 	bool[,,] trackVoxels;
 	List<Intersection> intersections;
@@ -200,7 +201,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	}
 
-	void SpawnCars(EntityManager dstManager, Entity entity, int carCout, int roadCount)
+	void SpawnCars(EntityManager dstManager, Entity entity, int carCount, int roadCount)
 	{
 
 		var carArchetype = dstManager.CreateArchetype(
@@ -222,16 +223,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			materials.Add(m);
 		}
 
-		// car initialization data
-		var colors = new List<float3>(); 
-		var roadIndices = new List<int>();
-		var lanes = new List<byte>();
-		var velocities = new List<float>();
-		var times = new List<float>();
-
-		InitializeCars(carCout, roadCount, colors, roadIndices, lanes, velocities, times);
-
-		int count = 4000;
+		int count = carCount;
 		var random = new Random(0x6E624EB7u);
 		
 		var maxCarsPerRoad = (int)math.ceil(count / (float)roadCount);
@@ -418,7 +410,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 		// plan roads broadly: first, as a grid of true/false voxels
 		int ticker = 0;
-		while (activeVoxels.Count>0 && ticker<50000) {
+		while (activeVoxels.Count>0 && ticker<maxGenerationTicks) {
 			ticker++;
 			int index = UnityEngine.Random.Range(0,activeVoxels.Count);
 			Vector3Int pos = activeVoxels[index];
