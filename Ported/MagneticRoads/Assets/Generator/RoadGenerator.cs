@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using Unity.Collections;
 using Unity.Entities;
@@ -105,10 +106,10 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	    
 	    // Etienne: add rendering entities for graph elements
 	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
-	    
 	    SpawnRoadRenderables(dstManager, renderable);
 	    SpawnIntersectionRenderables(dstManager, renderable);
-	    SpawnCarRenderables(dstManager, renderable, numCars);
+	    
+	    SpawnCars(dstManager, numCars, trackSplines.Count);
     }
 
 	void SpawnRoadRenderables(EntityManager dstManager, EntityArchetype renderable)
@@ -184,8 +185,14 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	}
 
-	void SpawnCarRenderables(EntityManager dstManager, EntityArchetype renderable, int count)
+	void SpawnCars(EntityManager dstManager, int carCout, int roadCount)
 	{
+		
+		var carArchetype = dstManager.CreateArchetype(
+			typeof(RenderMesh), 
+			typeof(LocalToWorld));
+
+		
 		var carRenderMesh = new RenderMesh
 		{
 			mesh = carMesh,
@@ -196,20 +203,55 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			subMesh = 0
 		};
 		
-		var random = new Random(0x6E624EB7u);
+		// car initialization data
+		var colors = new List<float3>(); 
+		var roadIndices = new List<int>();
+		var lanes = new List<byte>();
+		var velocities = new List<float>();
+		var times = new List<float>();
+
+		InitializeCars(carCout, roadCount, colors, roadIndices, lanes, velocities, times);
 		
-		for (int i = 0; i <= count; ++i)
+		
+		for (int i = 0; i <= carCout; ++i)
 		{
-			var e = dstManager.CreateEntity(renderable);
+			var e = dstManager.CreateEntity(carArchetype);
 			
-			// random transform, debug
-			var localToWorld = float4x4.Translate(random.NextFloat3() * 32);
+			// TODO set component data based on init data
 			
-			dstManager.SetComponentData(e, new LocalToWorld
-			{
-				Value = localToWorld
-			});
+			
 			dstManager.SetSharedComponentData(e, carRenderMesh);
+		}
+	}
+
+	// computes needed initial state for cars,
+	// computed data is meant to be copied to relevant car archetype components
+	void InitializeCars(
+		int count, 
+		int roadCount, // we assume road indices are in [0, roadCount - 1]
+		List<float3> colors, 
+		List<int> roadIndices, 
+		List<byte> lanes, // bitmask 
+		List<float> velocities, 
+		List<float> times) // splineT
+	{
+		var random = new Random(0x6E624EB7u);
+		var maxCarsPerRoad = (int)math.ceil(count / roadCount);
+		var createdCarCount = 0;
+			
+		for (int roadIndex = 0; roadIndex < roadCount; ++roadIndex)
+		{
+			var carsOnRoad = math.min(maxCarsPerRoad, count - createdCarCount);
+			createdCarCount += carsOnRoad;
+			for (int i = 0; i < carsOnRoad; ++i)
+			{
+				colors.Add(random.NextFloat3());
+				roadIndices.Add(roadIndex);
+				lanes.Add((byte)(i % 4));
+				velocities.Add(random.NextFloat(.4f, .8f));
+				// we assume systems will "solve inconsistencies", if not we'll go for a more deterministic approach
+				times.Add(random.NextFloat());
+			}
 		}
 	}
 
