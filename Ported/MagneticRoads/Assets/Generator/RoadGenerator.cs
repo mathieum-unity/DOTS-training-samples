@@ -152,11 +152,11 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	    foreach (var mesh in mergedRoadGeometries)
 	    {
 		    var e = dstManager.CreateEntity(renderable);
-		    dstManager.AddComponentData(e, new LocalToWorld
+		    dstManager.SetComponentData(e, new LocalToWorld
 		    {
 			    Value = float4x4.identity
 		    });
-		    dstManager.SetSharedComponentData(e, new RenderMesh
+		    dstManager.AddSharedComponentData(e, new RenderMesh
 		    {
 			    mesh = mesh,
 			    castShadows = ShadowCastingMode.On,
@@ -181,11 +181,11 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	    foreach (var intersection in intersections)
 	    {
 		    var e = dstManager.CreateEntity(renderable);
-		    dstManager.AddComponentData(e, new LocalToWorld
+		    dstManager.SetComponentData(e, new LocalToWorld
 		    {
 			    Value = intersection.GetMatrix()
 		    });
-		    dstManager.SetSharedComponentData(e, intersectionRenderMesh);
+		    dstManager.AddSharedComponentData(e, intersectionRenderMesh);
 	    }
     }
 
