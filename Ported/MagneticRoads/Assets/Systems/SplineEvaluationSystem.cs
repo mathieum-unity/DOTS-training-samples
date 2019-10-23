@@ -197,26 +197,25 @@ public class SplineEvaluationSystem : JobComponentSystem
         // each spline uses one out of three possible twisting methods:
         quaternion fromTo = quaternion.identity;
 
-        int twistMode = 1;
 
-//        if (twistMode == 0)
-//        {
-//            // method 1 - rotate startNormal around our current tangent
-//            float angle = SignedAngle(curve.startNormal, curve.endNormal, tangent);
-//            fromTo = quaternion.AxisAngle(tangent, angle);
-//        }
-//        else if (twistMode == 1)
-//        {
-//            // method 2 - rotate startNormal toward endNormal
-//            fromTo = fromToQuaternion(curve.startNormal, curve.endNormal);
-//        }
-//        else if (twistMode == 2)
-//        {
-//            // method 3 - rotate startNormal by "startOrientation-to-endOrientation" rotation
-//            quaternion startRotation = quaternion.LookRotation(curve.startTangent, curve.startNormal);
-//            quaternion endRotation = quaternion.LookRotation(curve.endTangent * -1, curve.endNormal);
-//            fromTo = math.mul(endRotation, math.inverse(startRotation));
-//        }
+        if (curve.twistMode == 0)
+        {
+            // method 1 - rotate startNormal around our current tangent
+            float angle = SignedAngle(curve.startNormal, curve.endNormal, tangent);
+            fromTo = quaternion.AxisAngle(tangent, angle);
+        }
+        else if (curve.twistMode == 1)
+        {
+            // method 2 - rotate startNormal toward endNormal
+            fromTo = fromToQuaternion(curve.startNormal, curve.endNormal);
+        }
+        else if (curve.twistMode == 2)
+        {
+            // method 3 - rotate startNormal by "startOrientation-to-endOrientation" rotation
+            quaternion startRotation = quaternion.LookRotation(curve.startTangent, curve.startNormal);
+            quaternion endRotation = quaternion.LookRotation(curve.endTangent * -1, curve.endNormal);
+            fromTo = math.mul(endRotation, math.inverse(startRotation));
+        }
 
         // other twisting methods can be added, but they need to
         // respect the relationship between startNormal and endNormal.
@@ -241,10 +240,10 @@ public class SplineEvaluationSystem : JobComponentSystem
     }
 
 
-    [BurstCompile]
+   // [BurstCompile]
     struct EvaluateSplineUpForward : IJobForEach<SplineT, BezierData, SplineSideDirection, Translation, Rotation>
     {
-        public void Execute(ref SplineT t,
+        public void Execute([ReadOnly] ref SplineT t,
             [ReadOnly] ref BezierData curve,
             [ReadOnly] ref SplineSideDirection dir,
             ref Translation position, ref Rotation rotation)
@@ -257,15 +256,13 @@ public class SplineEvaluationSystem : JobComponentSystem
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 
-            float2 extrudePoint;
-
             float tValue = t.Value;
             if (direction == -1)
             {
                 tValue = 1f - tValue;
             }
 
-            extrudePoint = new Vector2(-RoadGenerator.trackRadius * .5f * side,
+            float2 extrudePoint = new Vector2(-RoadGenerator.trackRadius * .5f * direction*side,
                 RoadGenerator.trackThickness * .5f * side);
 
             // find our position and orientation

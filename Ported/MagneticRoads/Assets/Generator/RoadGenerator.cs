@@ -113,6 +113,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 				    startTangent = new int3(trackSpline.startTangent.x, trackSpline.startTangent.y,
 					    trackSpline.startTangent.z),
 				    endTangent = new int3(trackSpline.endTangent.x, trackSpline.endTangent.y, trackSpline.endTangent.z),
+				    twistMode = trackSpline.twistMode
 			    },
 			    measuredLength = trackSpline.measuredLength,
 			    maxCarCount = trackSpline.maxCarCount,
@@ -208,7 +209,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			typeof(SplineSideDirection), 
 			typeof(BezierData),
 			typeof(Translation),
-			typeof(Scale),
+			typeof(NonUniformScale),
 			typeof(Rotation), 
 			typeof(ColorData));
 
@@ -257,7 +258,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 				SideValue = (byte)(((i>>1)%2)*2)
 			});
 
-			dstManager.SetComponentData(e, new Scale { Value = 0.1f });
+			dstManager.SetComponentData(e, new NonUniformScale { Value = new float3(0.1f, 0.08f,0.12f) });
 			dstManager.SetComponentData(e, trackSpline.curve);
 			dstManager.SetComponentData(e, new ColorData() {Value = random.NextFloat3()});
 			dstManager.SetSharedComponentData(e, carRenderMesh);

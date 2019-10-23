@@ -105,6 +105,7 @@ public struct BezierData : IComponentData
 	public int3 endNormal;
 	public int3 startTangent;
 	public int3 endTangent;
+	public int twistMode;
 }
 
 public struct SplineLength : IComponentData
