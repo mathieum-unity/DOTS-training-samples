@@ -20,7 +20,7 @@ public class TrackSplineSystem : ComponentSystem
     DynamicBuffer<IntersectionElementData> m_IntersectionBuffer;
     DynamicBuffer<IntersectionStateElementData> m_IntersectionStateBuffer;
     float m_DeltaTime = 0f;
-    Random m_Random = new Random(0);
+    Random m_Random = new Random(1);
 
     protected override void OnCreate()
     {
