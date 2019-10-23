@@ -103,6 +103,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			var trackSplineElement = new TrackSplineElementData()
 			{
 				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
+				endIntersection = intersections.IndexOf(trackSpline.endIntersection),
 				curve = new BezierData()
 				{
 					startPoint = trackSpline.startPoint,
@@ -210,6 +211,9 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			typeof(BezierData),
 			typeof(Translation),
 			typeof(NonUniformScale),
+			typeof(Next),
+			typeof(Lane),
+			typeof(NormalizedSpeed),
 			typeof(Rotation));
 
 		
@@ -229,7 +233,9 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		int currentRoadIndex = 0;
 		
 		var roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+		var roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
 		var trackSpline = roads[currentRoadIndex];
+		var trackSplineState = roadStates[currentRoadIndex];
 
 		for (int i = 0; i < count; ++i)
 		{
@@ -244,6 +250,20 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 				SideValue = (byte)(((i>>1)%2)*2)
 			});
 
+			var lane = new Lane
+			{
+				splineSide = random.NextFloat() > 0.5 ? 1 : -1,
+				splineDirection = random.NextFloat() > 0.5 ? 1 : -1,
+				trackSplineIndex = currentRoadIndex
+			};
+
+			var next = new Next()
+			{
+				Value = trackSplineState.GetLastEntity(lane.splineSide, lane.splineDirection)
+			};
+
+			dstManager.SetComponentData(e, lane);
+			dstManager.SetComponentData(e, next);
 			dstManager.SetComponentData(e, new NonUniformScale { Value = new float3(0.1f, 0.08f,0.12f) });
 			dstManager.SetComponentData(e, trackSpline.curve);
 			dstManager.SetSharedComponentData(e, new RenderMesh
@@ -258,12 +278,20 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			currentCarsOnRoad++;
 
+			roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
+			trackSplineState.SetLastEntity(lane.splineSide, lane.splineDirection, e);
+			var c = trackSplineState.GetCarCount(lane.splineSide, lane.splineDirection);
+			trackSplineState.SetCarCount(lane.splineSide, lane.splineDirection, c + 1);
+			roadStates[currentRoadIndex] = trackSplineState;
+
 			if (currentCarsOnRoad >= maxCarsPerRoad)
 			{
 				currentCarsOnRoad = 0;
 				currentRoadIndex++;
 				roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+				roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
 				trackSpline = roads[currentRoadIndex];
+				trackSplineState = roadStates[currentRoadIndex];
 			}
 		}
 	}

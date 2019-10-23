@@ -243,7 +243,7 @@ public class SplineEvaluationSystem : JobComponentSystem
    // [BurstCompile]
     struct EvaluateSplineUpForward : IJobForEach<SplineT, BezierData, SplineSideDirection, Translation, Rotation>
     {
-        public void Execute([ReadOnly] ref SplineT t,
+        public void Execute([ReadOnly] ref SplineT splineTimer,
             [ReadOnly] ref BezierData curve,
             [ReadOnly] ref SplineSideDirection dir,
             ref Translation position, ref Rotation rotation)
@@ -251,7 +251,7 @@ public class SplineEvaluationSystem : JobComponentSystem
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 
-            float tValue = t.Value;
+            float tValue = splineTimer.Value;
             if (direction == -1)
             {
                 tValue = 1f - tValue;
@@ -293,11 +293,11 @@ public class SplineEvaluationSystem : JobComponentSystem
 
     protected override JobHandle OnUpdate(JobHandle inputDependencies)
     {
-        var updateT = new UpdateT() {deltaTime = Time.deltaTime};
-        var jobHandle = updateT.Schedule(this, inputDependencies);
+        //var updateT = new UpdateT() {deltaTime = Time.deltaTime};
+        //var jobHandle = updateT.Schedule(this, inputDependencies);
         
         var upForward = new EvaluateSplineUpForward();
-        jobHandle = upForward.Schedule(this, jobHandle);
+        var jobHandle = upForward.Schedule(this, inputDependencies);
 
         return jobHandle;
 //        var posHandle = posJob.Schedule(this, upForwardHandle);

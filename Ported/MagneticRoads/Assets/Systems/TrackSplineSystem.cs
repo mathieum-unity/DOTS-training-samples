@@ -39,7 +39,7 @@ public class TrackSplineSystem : ComponentSystem
         m_IntersectionStateBuffer = EntityManager.GetBuffer<IntersectionStateElementData>(entities[0]);
         m_DeltaTime = Time.deltaTime;
 
-        Entities.WithNone<InIntersection>().ForEach((Entity e, ref Lane lane, ref SplineT splineTimer, ref Next next, ref NormalizedSpeed normalizedSpeed) =>
+        Entities.ForEach((Entity e, ref Lane lane, ref SplineT splineTimer, ref Next next, ref NormalizedSpeed normalizedSpeed) =>
         {
             Step1(ref lane, ref splineTimer, ref next, ref normalizedSpeed);
             Step2(e, ref splineTimer, ref normalizedSpeed, ref lane);
@@ -82,25 +82,6 @@ public class TrackSplineSystem : ComponentSystem
         {
             // we're "first in line" in our lane, but we still might need
             // to slow down if our next intersection is occupied
-            /*
-            if (lane.splineDirection == 1)
-            {
-                var occupied = m_IntersectionStateBuffer[roadSpline.endIntersection];
-                if (occupied[(lane.splineSide + 1) / 2])
-                {
-                    approachSpeed = (1f - splineTimer.Value) * .8f + .2f;
-                }
-            }
-            else
-            {
-                var occupied = m_IntersectionStateBuffer[roadSpline.startIntersection];
-                if (occupied[(lane.splineSide + 1) / 2])
-                {
-                    approachSpeed = (1f - splineTimer.Value) * .8f + .2f;
-                }
-            }
-            */
-
             var intersectionIndex = lane.splineDirection == 1 ? roadSpline.endIntersection : roadSpline.startIntersection;
             var occupied = m_IntersectionStateBuffer[intersectionIndex];
             if (occupied[(lane.splineSide + 1) / 2])
@@ -141,6 +122,7 @@ public class TrackSplineSystem : ComponentSystem
             else
             */
             {
+                var currentLane = lane;
                 var currentTrackIndex = lane.trackSplineIndex;
                 var roadSpline = m_TrackSplineBuffer[currentTrackIndex];
 
@@ -161,9 +143,9 @@ public class TrackSplineSystem : ComponentSystem
                 // now we need to know which road segment we'll move into
                 // (dead-ends force u-turns, but otherwise, u-turns are not allowed)
                 int newNeighbourIndex = 0;
+                int myNeighbourIndex = intersection.IndexOf(currentTrackIndex);
                 if (intersection.neighbourCount > 1)
                 {
-                    int myNeighbourIndex = intersection.IndexOf(currentTrackIndex);
                     newNeighbourIndex = m_Random.NextInt(intersection.neighbourCount-1);
                     if (newNeighbourIndex >= myNeighbourIndex)
                     {
@@ -261,30 +243,38 @@ public class TrackSplineSystem : ComponentSystem
                     splineTimer.Value -= 1f;
                     lane.trackSplineIndex = nextTrackSplineIndex;
 
-                    var clone = PostUpdateCommands.Instantiate(e);
-
                     var trackSplineState = m_TrackSplineStateBuffer[nextTrackSplineIndex];
                     var nextEntity = new Next()
                     {
                         Value = trackSplineState.GetLastEntity(lane.splineSide, lane.splineDirection)
                     };
 
+                    //Update trackState
                     var carCount = trackSplineState.GetCarCount(lane.splineSide, lane.splineDirection);
                     trackSplineState.SetCarCount(lane.splineSide, lane.splineDirection, carCount + 1);
-                    trackSplineState.SetLastEntity(lane.splineSide, lane.splineDirection, clone);
+                    trackSplineState.SetLastEntity(lane.splineSide, lane.splineDirection, e);
                     m_TrackSplineStateBuffer[nextTrackSplineIndex] = trackSplineState;
 
+                    //Update prev trackState
                     trackSplineState = m_TrackSplineStateBuffer[currentTrackIndex];
-                    trackSplineState.SetCarCount(lane.splineSide, lane.splineDirection, carCount - 1);
+                    trackSplineState.SetCarCount(currentLane.splineSide, currentLane.splineDirection, carCount - 1);
+
+                    if (carCount == 1)
+                        trackSplineState.SetLastEntity(currentLane.splineSide, currentLane.splineDirection, Entity.Null);
+
                     m_TrackSplineStateBuffer[currentTrackIndex] = trackSplineState;
 
                     //TODO: this should happen in another system that updates cars in intersections
                     occupied[(intersectionSide + 1) / 2] = false;
                     m_IntersectionStateBuffer[intersectionIndex] = occupied;
 
-                    PostUpdateCommands.SetComponent<BezierData>(clone, nextTrackSpline.curve);
-                    PostUpdateCommands.SetComponent<Next>(clone, nextEntity);
-                    PostUpdateCommands.DestroyEntity(e);
+                    PostUpdateCommands.SetComponent<BezierData>(e, nextTrackSpline.curve);
+                    PostUpdateCommands.SetComponent<SplineSideDirection>(e, new SplineSideDirection()
+                    {
+                        DirectionValue = (byte)(lane.splineDirection > 0 ? 1 : 0),
+                        SideValue = (byte)(lane.splineSide > 0 ? 1 : 0)
+
+                    });
                 }
             }
         }
