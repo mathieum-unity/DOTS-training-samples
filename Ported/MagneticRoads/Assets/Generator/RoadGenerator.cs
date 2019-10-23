@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using Unity.Collections;
 using Unity.Entities;
@@ -8,6 +10,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Rendering;
 using UnityEngine.Rendering;
+using Random = Unity.Mathematics.Random;
 
 [RequireComponent(typeof(ConvertToEntity))]
 [RequiresEntityConversion]
@@ -19,7 +22,9 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	public Material roadMaterial;
 	public Material carMaterial;
 	public Mesh intersectionMesh;
+	public Mesh carMesh;
 	public float carSpeed=2f;
+	public int numCars;
 
 	bool[,,] trackVoxels;
 	List<Intersection> intersections;
@@ -59,7 +64,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 		foreach (var trackSpline in trackSplines)
 			trackSplineStateBuffer.Add(new TrackSplineStateElementData());
-		
+
 		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
 		intersectionBuffer.Reserve(intersections.Count);
 
@@ -112,92 +117,155 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	    
 	    // Etienne: add rendering entities for graph elements
-
-	    List<Vector3> mergedVertices = new List<Vector3>();
-	    List<Vector2> mergedUvs = new List<Vector2>();
-	    List<int> mergedTriangles = new List<int>();
+	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
+	    SpawnRoadRenderables(dstManager, renderable);
+	    SpawnIntersectionRenderables(dstManager, renderable);
 	    
-	    List<Vector3> splineVertices = new List<Vector3>();
-	    List<Vector2> splineUvs = new List<Vector2>();
-	    List<int> splineTriangles = new List<int>();
-	    
-	    List<Mesh> mergedRoadGeometries = new List<Mesh>();
-	    var triCount = 0;
-
-	    foreach (var trackSpline in trackSplines)
-	    {
-		    splineVertices.Clear();
-		    splineUvs.Clear();
-		    splineTriangles.Clear();
-		    trackSpline.GenerateMesh(splineVertices, splineUvs, splineTriangles);
-
-			// start a new mesh
-		    if (triCount + splineTriangles.Count > trisPerMesh)
-		    {
-			    var mesh = new Mesh();
-			    mesh.vertices = mergedVertices.ToArray();
-			    mesh.uv = mergedUvs.ToArray();
-			    mesh.triangles = mergedTriangles.ToArray();
-			    mergedRoadGeometries.Add(mesh);
-			    
-			    mergedVertices.Clear();
-			    mergedUvs.Clear();
-			    mergedTriangles.Clear();
-			    triCount = 0;
-		    }
-		    else
-		    {
-			    triCount += splineTriangles.Count;
-			    mergedVertices.AddRange(splineVertices);
-			    mergedUvs.AddRange(splineUvs);
-			    mergedTriangles.AddRange(splineTriangles);
-		    }
-	    }
-	    
-	    var lastMesh = new Mesh();
-	    lastMesh.vertices = mergedVertices.ToArray();
-	    lastMesh.uv = mergedUvs.ToArray();
-	    lastMesh.triangles = mergedTriangles.ToArray();
-	    mergedRoadGeometries.Add(lastMesh);
-	    
-	    var renderable = dstManager.CreateArchetype(typeof(MeshRenderer), typeof(MeshFilter), typeof(LocalToWorld));
-	    foreach (var mesh in mergedRoadGeometries)
-	    {
-		    var e = dstManager.CreateEntity(renderable);
-		    dstManager.SetComponentData(e, new LocalToWorld
-		    {
-			    Value = float4x4.identity
-		    });
-		    dstManager.AddSharedComponentData(e, new RenderMesh
-		    {
-			    mesh = mesh,
-			    castShadows = ShadowCastingMode.On,
-			    layer = 0,
-			    material = roadMaterial,
-			    receiveShadows = true,
-			    subMesh = 0
-		    });
-	    }
-
-	    var intersectionRenderMesh = new RenderMesh
-	    {
-		    mesh = intersectionMesh,
-		    castShadows = ShadowCastingMode.On,
-		    layer = 0,
-		    material = roadMaterial,
-		    receiveShadows = true,
-		    subMesh = 0
-	    };
-	    foreach (var intersection in intersections)
-	    {
-		    var e = dstManager.CreateEntity(renderable);
-		    dstManager.SetComponentData(e, new LocalToWorld
-		    {
-			    Value = intersection.GetMatrix()
-		    });
-		    dstManager.AddSharedComponentData(e, intersectionRenderMesh);
-	    }
+	    SpawnCars(dstManager, numCars, trackSplines.Count);
     }
+
+	void SpawnRoadRenderables(EntityManager dstManager, EntityArchetype renderable)
+	{
+		List<Vector3> splineVertices = new List<Vector3>();
+		List<Vector2> splineUvs = new List<Vector2>();
+		List<int> splineTriangles = new List<int>();
+	    
+		List<Mesh> roadGeometries = new List<Mesh>();
+		var index = 0;
+		foreach (var trackSpline in trackSplines)
+		{
+			++index;
+		   
+			trackSpline.GenerateMesh(splineVertices, splineUvs, splineTriangles);
+		   
+			// start a new mesh
+			if (splineTriangles.Count / 3 > trisPerMesh || index == trackSplines.Count)
+			{
+				// instanciate merged mesh
+				var mesh = new Mesh();
+				mesh.SetVertices(splineVertices);
+				mesh.SetUVs(0, splineUvs);
+				mesh.SetTriangles(splineTriangles, 0);
+				mesh.RecalculateNormals();
+				mesh.RecalculateBounds();
+				roadGeometries.Add(mesh);
+			    
+				splineVertices.Clear();
+				splineUvs.Clear();
+				splineTriangles.Clear();
+			}
+		}
+	    
+		foreach (var mesh in roadGeometries)
+		{
+			var e = dstManager.CreateEntity(renderable);
+			dstManager.SetComponentData(e, new LocalToWorld
+			{
+				Value = float4x4.identity
+			});
+			dstManager.SetSharedComponentData(e, new RenderMesh
+			{
+				mesh = mesh,
+				castShadows = ShadowCastingMode.On,
+				layer = 0,
+				material = roadMaterial,
+				receiveShadows = true,
+				subMesh = 0
+			});
+		}
+	}
+
+	void SpawnIntersectionRenderables(EntityManager dstManager, EntityArchetype renderable)
+	{
+		var intersectionRenderMesh = new RenderMesh
+		{
+			mesh = intersectionMesh,
+			castShadows = ShadowCastingMode.On,
+			layer = 0,
+			material = roadMaterial,
+			receiveShadows = true,
+			subMesh = 0
+		};
+		foreach (var intersection in intersections)
+		{
+			var e = dstManager.CreateEntity(renderable);
+			dstManager.SetComponentData(e, new LocalToWorld
+			{
+				Value = intersection.GetMatrix()
+			});
+			dstManager.SetSharedComponentData(e, intersectionRenderMesh);
+		}
+	}
+
+	void SpawnCars(EntityManager dstManager, int carCout, int roadCount)
+	{
+		
+		var carArchetype = dstManager.CreateArchetype(
+			typeof(RenderMesh), 
+			typeof(LocalToWorld));
+
+		
+		var carRenderMesh = new RenderMesh
+		{
+			mesh = carMesh,
+			castShadows = ShadowCastingMode.On,
+			layer = 0,
+			material = carMaterial,
+			receiveShadows = true,
+			subMesh = 0
+		};
+		
+		// car initialization data
+		var colors = new List<float3>(); 
+		var roadIndices = new List<int>();
+		var lanes = new List<byte>();
+		var velocities = new List<float>();
+		var times = new List<float>();
+
+		InitializeCars(carCout, roadCount, colors, roadIndices, lanes, velocities, times);
+		
+		
+		for (int i = 0; i <= carCout; ++i)
+		{
+			var e = dstManager.CreateEntity(carArchetype);
+			
+			// TODO set component data based on init data
+			
+			
+			dstManager.SetSharedComponentData(e, carRenderMesh);
+		}
+	}
+
+	// computes needed initial state for cars,
+	// computed data is meant to be copied to relevant car archetype components
+	void InitializeCars(
+		int count, 
+		int roadCount, // we assume road indices are in [0, roadCount - 1]
+		List<float3> colors, 
+		List<int> roadIndices, 
+		List<byte> lanes, // bitmask 
+		List<float> velocities, 
+		List<float> times) // splineT
+	{
+		var random = new Random(0x6E624EB7u);
+		var maxCarsPerRoad = (int)math.ceil(count / roadCount);
+		var createdCarCount = 0;
+			
+		for (int roadIndex = 0; roadIndex < roadCount; ++roadIndex)
+		{
+			var carsOnRoad = math.min(maxCarsPerRoad, count - createdCarCount);
+			createdCarCount += carsOnRoad;
+			for (int i = 0; i < carsOnRoad; ++i)
+			{
+				colors.Add(random.NextFloat3());
+				roadIndices.Add(roadIndex);
+				lanes.Add((byte)(i % 4));
+				velocities.Add(random.NextFloat(.4f, .8f));
+				// we assume systems will "solve inconsistencies", if not we'll go for a more deterministic approach
+				times.Add(random.NextFloat());
+			}
+		}
+	}
 
 	long HashIntersectionPair(Intersection a, Intersection b) {
 		// pack two intersections' IDs into one int64

@@ -106,7 +106,7 @@ public struct TrackSplineElementData : IBufferElementData
 	public float carQueueSize;
 }
 
-public struct RoadComponent : IComponentData
+/*public struct RoadComponent : IComponentData
 {
     public int trackSplineIndex;
     
@@ -133,7 +133,7 @@ public struct RoadComponent : IComponentData
             default: return bottomRightLane;
         }
     }
-}
+}*/
 
 public struct TrackSplineStateElementData : IBufferElementData
 {
