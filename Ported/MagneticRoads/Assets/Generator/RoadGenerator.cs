@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Security.Cryptography;
 using TMPro;
 using UnityEngine;
 using Unity.Collections;
@@ -210,20 +211,17 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			typeof(BezierData),
 			typeof(Translation),
 			typeof(NonUniformScale),
-			typeof(Rotation), 
-			typeof(ColorData));
+			typeof(Rotation));
 
 		
-		var carRenderMesh = new RenderMesh
+		var materials = new List<Material>();
+		for (int i = 0; i != 64; ++i)
 		{
-			mesh = carMesh,
-			castShadows = ShadowCastingMode.On,
-			layer = 0,
-			material = carMaterial,
-			receiveShadows = true,
-			subMesh = 0
-		};
-		
+			var m = new Material(carMaterial);
+			m.color = UnityEngine.Random.ColorHSV();
+			materials.Add(m);
+		}
+
 		// car initialization data
 		var colors = new List<float3>(); 
 		var roadIndices = new List<int>();
@@ -260,8 +258,15 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			dstManager.SetComponentData(e, new NonUniformScale { Value = new float3(0.1f, 0.08f,0.12f) });
 			dstManager.SetComponentData(e, trackSpline.curve);
-			dstManager.SetComponentData(e, new ColorData() {Value = random.NextFloat3()});
-			dstManager.SetSharedComponentData(e, carRenderMesh);
+			dstManager.SetSharedComponentData(e, new RenderMesh
+				{
+					mesh = carMesh,
+					castShadows = ShadowCastingMode.On,
+					layer = 0,
+					material = materials[random.NextInt(materials.Count)],
+					receiveShadows = true,
+					subMesh = 0
+				});
 
 			currentCarsOnRoad++;
 
