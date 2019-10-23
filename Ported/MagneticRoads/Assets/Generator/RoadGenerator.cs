@@ -87,41 +87,42 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			intersectionBuffer.Add(intersectionElement);
 		}
 
-		var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
-		trackSplineBuffer.Reserve(trackSplines.Count);
-
-		foreach (var trackSpline in trackSplines)
-		{
-			var trackSplineElement = new TrackSplineElementData()
-			{
-				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
-				curve = new BezierData()
-				{
-					startPoint = trackSpline.startPoint,
-					endPoint = trackSpline.endPoint,
-					anchor1 = trackSpline.anchor1,
-					anchor2 = trackSpline.anchor2,
-					startNormal = new int3(trackSpline.startNormal.x, trackSpline.startNormal.y,
-						trackSpline.startNormal.z),
-					endNormal = new int3(trackSpline.endNormal.x, trackSpline.endNormal.y, trackSpline.endNormal.z),
-					startTangent = new int3(trackSpline.startTangent.x, trackSpline.startTangent.y,
-						trackSpline.startTangent.z),
-					endTangent = new int3(trackSpline.endTangent.x, trackSpline.endTangent.y, trackSpline.endTangent.z),
-				},
-				measuredLength = trackSpline.measuredLength,
-				maxCarCount = trackSpline.maxCarCount,
-				carQueueSize = trackSpline.carQueueSize
-			};
-
-			trackSplineBuffer.Add(trackSplineElement);
-		}
-	    
-		SpawnCars(dstManager, entity, numCars, trackSplines.Count);
 	    
 	    // Etienne: add rendering entities for graph elements
 	    var renderable = dstManager.CreateArchetype(typeof(RenderMesh), typeof(LocalToWorld));
 	    SpawnRoadRenderables(dstManager, renderable);
 	    SpawnIntersectionRenderables(dstManager, renderable);
+
+	    var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
+	    trackSplineBuffer.Reserve(trackSplines.Count);
+
+	    foreach (var trackSpline in trackSplines)
+	    {
+		    var trackSplineElement = new TrackSplineElementData()
+		    {
+			    startIntersection = intersections.IndexOf(trackSpline.startIntersection),
+			    curve = new BezierData()
+			    {
+				    startPoint = trackSpline.startPoint,
+				    endPoint = trackSpline.endPoint,
+				    anchor1 = trackSpline.anchor1,
+				    anchor2 = trackSpline.anchor2,
+				    startNormal = new int3(trackSpline.startNormal.x, trackSpline.startNormal.y,
+					    trackSpline.startNormal.z),
+				    endNormal = new int3(trackSpline.endNormal.x, trackSpline.endNormal.y, trackSpline.endNormal.z),
+				    startTangent = new int3(trackSpline.startTangent.x, trackSpline.startTangent.y,
+					    trackSpline.startTangent.z),
+				    endTangent = new int3(trackSpline.endTangent.x, trackSpline.endTangent.y, trackSpline.endTangent.z),
+			    },
+			    measuredLength = trackSpline.measuredLength,
+			    maxCarCount = trackSpline.maxCarCount,
+			    carQueueSize = trackSpline.carQueueSize
+		    };
+
+		    trackSplineBuffer.Add(trackSplineElement);
+	    }
+	    
+	    SpawnCars(dstManager, entity, numCars, trackSplines.Count);
     }
 
 	void SpawnRoadRenderables(EntityManager dstManager, EntityArchetype renderable)
