@@ -100,56 +100,40 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		}
 	    
 	    // Etienne: add rendering entities for graph elements
-
-	    List<Vector3> mergedVertices = new List<Vector3>();
-	    List<Vector2> mergedUvs = new List<Vector2>();
-	    List<int> mergedTriangles = new List<int>();
+		
 	    
 	    List<Vector3> splineVertices = new List<Vector3>();
 	    List<Vector2> splineUvs = new List<Vector2>();
 	    List<int> splineTriangles = new List<int>();
 	    
-	    List<Mesh> mergedRoadGeometries = new List<Mesh>();
-	    var triCount = 0;
-
+	    List<Mesh> roadGeometries = new List<Mesh>();
+	    var index = 0;
 	    foreach (var trackSpline in trackSplines)
 	    {
-		    splineVertices.Clear();
-		    splineUvs.Clear();
-		    splineTriangles.Clear();
+		    ++index;
+		   
 		    trackSpline.GenerateMesh(splineVertices, splineUvs, splineTriangles);
-
-			// start a new mesh
-		    if (triCount + splineTriangles.Count > trisPerMesh)
+		   
+		    // start a new mesh
+		    if (splineTriangles.Count / 3 > trisPerMesh || index == trackSplines.Count)
 		    {
+			    // instanciate merged mesh
 			    var mesh = new Mesh();
-			    mesh.vertices = mergedVertices.ToArray();
-			    mesh.uv = mergedUvs.ToArray();
-			    mesh.triangles = mergedTriangles.ToArray();
-			    mergedRoadGeometries.Add(mesh);
+			    mesh.SetVertices(splineVertices);
+			    mesh.SetUVs(0, splineUvs);
+			    mesh.SetTriangles(splineTriangles, 0);
+			    mesh.RecalculateNormals();
+			    mesh.RecalculateBounds();
+			    roadGeometries.Add(mesh);
 			    
-			    mergedVertices.Clear();
-			    mergedUvs.Clear();
-			    mergedTriangles.Clear();
-			    triCount = 0;
-		    }
-		    else
-		    {
-			    triCount += splineTriangles.Count;
-			    mergedVertices.AddRange(splineVertices);
-			    mergedUvs.AddRange(splineUvs);
-			    mergedTriangles.AddRange(splineTriangles);
+			    splineVertices.Clear();
+			    splineUvs.Clear();
+			    splineTriangles.Clear();
 		    }
 	    }
 	    
-	    var lastMesh = new Mesh();
-	    lastMesh.vertices = mergedVertices.ToArray();
-	    lastMesh.uv = mergedUvs.ToArray();
-	    lastMesh.triangles = mergedTriangles.ToArray();
-	    mergedRoadGeometries.Add(lastMesh);
-	    
 	    var renderable = dstManager.CreateArchetype(typeof(MeshRenderer), typeof(MeshFilter), typeof(LocalToWorld));
-	    foreach (var mesh in mergedRoadGeometries)
+	    foreach (var mesh in roadGeometries)
 	    {
 		    var e = dstManager.CreateEntity(renderable);
 		    dstManager.SetComponentData(e, new LocalToWorld
@@ -166,8 +150,6 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			    subMesh = 0
 		    });
 	    }
-
-	    var index = 0;
 
 	    var intersectionRenderMesh = new RenderMesh
 	    {

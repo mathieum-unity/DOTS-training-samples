@@ -54,7 +54,7 @@ public struct TrackSplineElementData : IBufferElementData
 	public float carQueueSize;
 }
 
-public struct RoadComponent : IComponentData
+/*public struct RoadComponent : IComponentData
 {
     public Entity edge; // a road corresponds to a graph edge
     
@@ -81,7 +81,7 @@ public struct RoadComponent : IComponentData
             default: return bottomRightLane;
         }
     }
-}
+}*/
 
 public struct IntersectionHandle : IComponentData
 {
