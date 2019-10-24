@@ -1,9 +1,12 @@
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
+using Unity.Jobs;
 using UnityEngine;
 
-public class CarRenderingSystem : ComponentSystem
+public class CarRenderingSystem : JobComponentSystem
 {
     EntityQuery m_Group;
 
@@ -12,29 +15,38 @@ public class CarRenderingSystem : ComponentSystem
         m_Group = GetEntityQuery(ComponentType.ReadOnly<ColorData>(), ComponentType.ReadOnly<LocalToWorld>());
     }
 
-    protected override void OnUpdate()
+    [BurstCompile]
+    struct CollectRenderingDataJob : IJobForEachWithEntity<LocalToWorld, ColorData>
+    {
+        public NativeArray<float4x4> Transforms;
+        public NativeArray<float4> Colors;
+
+        public void Execute(Entity entity, int index,
+            [ReadOnly] ref LocalToWorld localToWorld,
+            [ReadOnly] ref ColorData color)
+        {
+            Transforms[index] = localToWorld.Value;
+            Colors[index] = color.value;
+        }
+    }
+
+    protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
         var renderer = CarRenderer.GetInstance();
         if (renderer == null)
         {
             Debug.LogError("Looks like CarRenderer was not instanciated.");
-            return;
+            return inputDeps;
         }
 
-        var chunks = m_Group.CreateArchetypeChunkArray(Allocator.TempJob);
-        var localToWorldType = GetArchetypeChunkComponentType<LocalToWorld>(true);
-        var colorDataType = GetArchetypeChunkComponentType<ColorData>(true);
-
-        var access = renderer.GetWriteAccess();
-        access.Reset();
-        foreach (var chunk in chunks)
+        renderer.Resize(m_Group.CalculateEntityCount());
+        
+        var job = new CollectRenderingDataJob
         {
-            var transforms = chunk.GetNativeArray(localToWorldType);
-            var colors = chunk.GetNativeArray(colorDataType);
-            access.AddRange(transforms, colors);
-        }
-        chunks.Dispose();
-        access.Apply();
+            Transforms = renderer.transforms, Colors = renderer.colors
+        }.Schedule(this, inputDeps);
+
+        return job;
     }
 }
 
