@@ -259,7 +259,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			var next = new Next()
 			{
-				Value = trackSplineState.GetLastEntity(lane.splineSide, lane.splineDirection)
+				Value = trackSplineState.GetLastEntityIn(lane.splineSide, lane.splineDirection)
 			};
 
 			dstManager.SetComponentData(e, lane);
@@ -279,7 +279,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			currentCarsOnRoad++;
 
 			roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
-			trackSplineState.SetLastEntity(lane.splineSide, lane.splineDirection, e);
+			trackSplineState.SetLastEntityIn(lane.splineSide, lane.splineDirection, e);
 			var c = trackSplineState.GetCarCount(lane.splineSide, lane.splineDirection);
 			trackSplineState.SetCarCount(lane.splineSide, lane.splineDirection, c + 1);
 			roadStates[currentRoadIndex] = trackSplineState;

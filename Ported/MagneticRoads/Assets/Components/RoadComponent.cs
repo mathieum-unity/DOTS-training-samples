@@ -109,45 +109,20 @@ public struct TrackSplineElementData : IBufferElementData
     public int twistMode;
 }
 
-/*public struct RoadComponent : IComponentData
-{
-    public int trackSplineIndex;
-    
-    public NativeList<Entity> topLeftLane;
-    public NativeList<Entity> topRightLane;
-    public NativeList<Entity> bottomLeftLane;
-    public NativeList<Entity> bottomRightLane;
-
-    public const int k_LanesPerRoad = 4;
-    
-    // lets us iterate over lanes
-    static int GetLaneIndex(bool isLeft, bool isTop)
-    {
-        return (isLeft ? 0 : 1) + (isTop ? 0 : 2);
-    }
-
-    public NativeList<Entity> GetLane(bool isLeft, bool isTop)
-    {
-        switch (GetLaneIndex(isLeft, isTop))
-        {
-            case 0: return topLeftLane;
-            case 1: return topRightLane;
-            case 2: return bottomLeftLane;
-            default: return bottomRightLane;
-        }
-    }
-}*/
-
 public struct TrackSplineStateElementData : IBufferElementData
 {
     public int carCount0;
     public int carCount1;
     public int carCount2;
     public int carCount3;
-    public Entity lastEntity0;
-    public Entity lastEntity1;
-    public Entity lastEntity2;
-    public Entity lastEntity3;
+    public Entity lastEntityIn0;
+    public Entity lastEntityIn1;
+    public Entity lastEntityIn2;
+    public Entity lastEntityIn3;
+    public Entity lastEntityOut0;
+    public Entity lastEntityOut1;
+    public Entity lastEntityOut2;
+    public Entity lastEntityOut3;
 
     int GetLaneIndex(int splineSide, int splineDirection)
     {
@@ -184,31 +159,61 @@ public struct TrackSplineStateElementData : IBufferElementData
         throw new System.IndexOutOfRangeException();
     }
 
-    public Entity GetLastEntity(int splineSide, int splineDirection)
+    public Entity GetLastEntityIn(int splineSide, int splineDirection)
     {
         var index = GetLaneIndex(splineSide, splineDirection);
 
         switch (index)
         {
-            case 0: return lastEntity0;
-            case 1: return lastEntity1;
-            case 2: return lastEntity2;
-            case 3: return lastEntity3;
+            case 0: return lastEntityIn0;
+            case 1: return lastEntityIn1;
+            case 2: return lastEntityIn2;
+            case 3: return lastEntityIn3;
         }
 
         throw new System.IndexOutOfRangeException();
     }
 
-    public void SetLastEntity(int splineSide, int splineDirection, Entity value)
+    public void SetLastEntityIn(int splineSide, int splineDirection, Entity value)
     {
         var index = GetLaneIndex(splineSide, splineDirection);
 
         switch (index)
         {
-            case 0: lastEntity0 = value; return;
-            case 1: lastEntity1 = value; return;
-            case 2: lastEntity2 = value; return;
-            case 3: lastEntity3 = value; return;
+            case 0: lastEntityIn0 = value; return;
+            case 1: lastEntityIn1 = value; return;
+            case 2: lastEntityIn2 = value; return;
+            case 3: lastEntityIn3 = value; return;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
+
+    public Entity GetLastEntityOut(int splineSide, int splineDirection)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: return lastEntityOut0;
+            case 1: return lastEntityOut1;
+            case 2: return lastEntityOut2;
+            case 3: return lastEntityOut3;
+        }
+
+        throw new System.IndexOutOfRangeException();
+    }
+
+    public void SetLastEntityOut(int splineSide, int splineDirection, Entity value)
+    {
+        var index = GetLaneIndex(splineSide, splineDirection);
+
+        switch (index)
+        {
+            case 0: lastEntityOut0 = value; return;
+            case 1: lastEntityOut1 = value; return;
+            case 2: lastEntityOut2 = value; return;
+            case 3: lastEntityOut3 = value; return;
         }
 
         throw new System.IndexOutOfRangeException();
