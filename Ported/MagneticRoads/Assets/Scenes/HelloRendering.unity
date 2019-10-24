@@ -151,7 +151,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2834799bfd424e16acba0937afca829, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  voxelCount: 120
+  voxelCount: 60
   voxelSize: 1.25
   trisPerMesh: 4000
   roadMaterial: {fileID: 2100000, guid: c2261b4990b26324bac9164b7f53de5e, type: 2}
@@ -159,8 +159,8 @@ MonoBehaviour:
   intersectionMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   carMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   carSpeed: 2
-  numCars: 50000
-  maxGenerationTicks: 500000
+  numCars: 5000
+  maxGenerationTicks: 50000
 --- !u!114 &112166903
 MonoBehaviour:
   m_ObjectHideFlags: 0

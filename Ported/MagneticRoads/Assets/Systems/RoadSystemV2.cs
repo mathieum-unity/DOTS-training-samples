@@ -1,17 +1,292 @@
-//using System.ComponentModel;
-//using Unity.Burst;
-//using Unity.Collections;
-//using Unity.Entities;
-//using Unity.Jobs;
-//using Unity.Mathematics;
-//using Unity.Transforms;
-//using UnityEngine;
-//using static Unity.Mathematics.math;
-//using Random = Unity.Mathematics.Random;
+
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Jobs;
+using Unity.Mathematics;
+using Unity.Transforms;
+using UnityEngine;
+using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
+
+[UpdateInGroup(typeof(SimulationSystemGroup))]
+public class RoadSystemV2 : JobComponentSystem
+{
+    [BurstCompile]
+    struct UpdateSpline<QueueType> : IJobForEach_BCCC<QueueType, BezierData, RoadData, SplineLength> where QueueType: struct, IBufferElementData, IQueueEntry
+    {
+        [ReadOnly]public ComponentDataFromEntity<SplineT> splineAccess;
+        [ReadOnly]public ComponentDataFromEntity<IntersectionData> intersectionAccess;
+        static readonly float maxSpeed = 2f;
+
+        public float m_DeltaTime;
+        public int direction;
+        public int side;
+ 
+        public float UpdateSpeed(ref QueueType queueEntry, float measureLength, float maxTValue, bool first, bool slowDown)
+        {
+            var splineConstraints = new SplineTConstraints() {MaxTValue = maxTValue, isFirst = first, needsSlowDown = slowDown};
+            
+            queueEntry.NormalizedSpeed += m_DeltaTime * 2f;
+
+            if (queueEntry.NormalizedSpeed > 1f)
+            {
+                queueEntry.NormalizedSpeed = 1f;
+            }
+
+            queueEntry.SplineTimer += queueEntry.NormalizedSpeed * maxSpeed / measureLength * m_DeltaTime;
+
+            var approachSpeed = 1f;
+
+            if (!splineConstraints.isFirst)
+            {
+                // someone's ahead of us - don't clip through them
+                var maxT = splineConstraints.MaxTValue;
+
+                if (queueEntry.SplineTimer > maxT)
+                {
+                    queueEntry.SplineTimer = maxT;
+                    queueEntry.NormalizedSpeed = 0f;
+                }
+                else
+                {
+                    // slow down when approaching another car
+                    approachSpeed = (maxT - queueEntry.SplineTimer) * 5f;
+                }
+            }
+            else
+            {
+                // we're "first in line" in our lane, but we still might need
+                // to slow down if our next intersection is occupied
+                if (splineConstraints.needsSlowDown)
+                {
+                    approachSpeed = (1f - queueEntry.SplineTimer) * .8f + .2f;
+                }
+            }
+
+            if (queueEntry.NormalizedSpeed > approachSpeed)
+            {
+                queueEntry.NormalizedSpeed = approachSpeed;
+            }
+
+            if (queueEntry.SplineTimer > 1)
+            {
+                queueEntry.SplineTimer = 0;
+                
+                //switch direction
+//                int direction = ((int) dir.DirectionValue) - 1;
+//                direction *= -1;
+//                dir.DirectionValue = (byte)(direction + 1);
+            }
+            
+            return queueEntry.SplineTimer;
+        }
+        
+        public void Execute(DynamicBuffer<QueueType> queue,
+            [ReadOnly] ref BezierData curve,
+            [ReadOnly] ref RoadData rd,
+            [ReadOnly] ref SplineLength splineLength)
+        {
+            if (queue.Length <= 1)
+                return;
+
+            QueueType first = queue[0];
+
+            float spacing = 1.0f / rd.capacity;
+
+            Entity intersectionEntity;
+
+            if (direction > 0)
+            {
+                intersectionEntity = rd.endIntersection;
+            }
+            else
+            {
+                intersectionEntity = rd.startIntersection;
+            }
+            
+            var intersection = intersectionAccess[intersectionEntity];
+
+            bool occupied = side > 0 ? intersection.occupied1 : intersection.occupied0;
+            
+            var maxT = UpdateSpeed(ref first, splineLength.Value, 1000, true, occupied);
+            queue[0] = first;
+            for (int i = 1; i < queue.Length; ++i)
+            {
+                QueueType second = queue[i];
+                
+                maxT = UpdateSpeed(ref second,splineLength.Value,maxT - spacing, false, false);
+                queue[i] = second;
+            }
+        }
+    }
+    
+
+    protected override void OnCreate()
+    {
+    }
+
+    protected override JobHandle OnUpdate(JobHandle inputDeps)
+    {
+        float dt = Time.deltaTime;
+
+        var updateSplineT0 = new UpdateSpline<QueueData0>()
+        {
+            splineAccess = GetComponentDataFromEntity<SplineT>(),
+            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+            direction=0,
+            side = 0,
+            m_DeltaTime = dt,
+        };
+
+
+        var updateSplineT1 = new UpdateSpline<QueueData1>()
+        {
+            splineAccess = GetComponentDataFromEntity<SplineT>(),
+            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+            direction=1,
+            side = 0,
+            m_DeltaTime = dt,
+        };
+
+        var updateSplineT2 = new UpdateSpline<QueueData2>()
+        {
+            splineAccess = GetComponentDataFromEntity<SplineT>(),
+            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+            direction=0,
+            side = 1,
+            m_DeltaTime = dt,
+        };
+
+        var updateSplineT3 = new UpdateSpline<QueueData3>()
+        {
+            splineAccess = GetComponentDataFromEntity<SplineT>(),
+            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+            direction=1,
+            side = 1,
+            m_DeltaTime = dt,
+        };
+        
+//        var updateSplineAll = new UpdateSplineAll()
+//        {
+//            splineAccess = GetComponentDataFromEntity<SplineT>(),
+//            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+//            CommandBuffer = m_Barrier.CreateCommandBuffer().ToConcurrent(),
+//        };
+
+
+        NativeArray<JobHandle> updateJobs = new NativeArray<JobHandle>(4, Allocator.Temp);
+        
+        updateJobs[0] = updateSplineT0.Schedule(this, inputDeps);
+        updateJobs[1] = updateSplineT1.Schedule(this, inputDeps);
+        updateJobs[2] = updateSplineT2.Schedule(this, inputDeps);
+        updateJobs[3] = updateSplineT3.Schedule(this, inputDeps);
+        
+        var updateJobDeps = JobHandle.CombineDependencies(updateJobs);
+
+        updateJobs.Dispose();
+
+        return updateJobDeps;
+    }
+}
+///*
+//[UpdateInGroup(typeof(SimulationSystemGroup))]
+//[UpdateAfter(typeof(RoadSystemV2))]
+//public class UpdateSpeedSystem  : JobComponentSystem
+//{
+//    /*  struct UpdateSplineT : IJobForEachWithEntity<RoadReference, SplineLength, SplineSideDirection, SplineTConstraints, NormalizedSpeed, SplineT>
+//    {
+//        public float m_DeltaTime;
+//        static readonly float maxSpeed = 2f;
+//        [ReadOnly]public BufferFromEntity<QueueData0> queue0Access;
+//        [ReadOnly]public BufferFromEntity<QueueData1> queue1Access;
+//        [ReadOnly]public BufferFromEntity<QueueData2> queue2Access;
+//        [ReadOnly]public BufferFromEntity<QueueData3> queue3Access;
 //
+//        void AssignConstraints<QueueType>(Entity carEntity, 
+//            DynamicBuffer<QueueType> buffer, ref SplineTConstraints c) where QueueType: struct, IQueueEntry
+//        {
+//            for (int i = 0; i < buffer.Length; ++i)
+//            {
+//                if (buffer[i].carId == carEntity)
+//                {
+//                    c = buffer[i].constraints;
+//                    return;
+//                }
+//            }
+//        }
+//        
+//        public void Execute(Entity carEntity, int jobIndex, [ReadOnly] ref RoadReference currentRoad,
+//                            [ReadOnly] ref SplineLength measuredLength, 
+//                            [ReadOnly] ref SplineSideDirection sideDirection, 
+//                            ref SplineTConstraints splineConstraints, 
+//                            ref NormalizedSpeed normalizedSpeed, 
+//                            ref SplineT splineTimer)
+//        {
+//            int QueueIndex = sideDirection.QueueIndex();
+//
+//            switch (QueueIndex)
+//            {
+//                case 0:
+//                    AssignConstraints(carEntity, queue0Access[currentRoad.Value], ref splineConstraints); 
+//                    break;
+//                case 1:
+//                    AssignConstraints(carEntity, queue1Access[currentRoad.Value], ref splineConstraints); 
+//                    break;
+//                case 2:
+//                    AssignConstraints(carEntity, queue2Access[currentRoad.Value], ref splineConstraints); 
+//                    break;
+//                case 3:
+//                    AssignConstraints(carEntity, queue3Access[currentRoad.Value], ref splineConstraints); 
+//                    break;
+//                default:
+//                    break;
+//            }
+//            
+//           
+//        }
+//    }*/
+//
+//    struct SelectNextRoad : IJobForEach<SplineT, SplineSideDirection>
+//    {
+//        public void Execute(ref SplineT t,
+//            ref SplineSideDirection dir
+//        )
+//        {
+//            if (t.Value > 1)
+//            {
+//                t.Value = 0;
+//                
+//                int direction = ((int) dir.DirectionValue) - 1;
+//                direction *= -1;
+//                dir.DirectionValue = (byte)(direction + 1);
+//            }
+//        }
+//    }
+//    
+//    protected override JobHandle OnUpdate(JobHandle inputDeps)
+//    {
+//        var jobHandle = inputDeps;
+//
+//        var updateT = new UpdateSplineT()
+//        {
+//            m_DeltaTime = Time.deltaTime,
+//            queue0Access = GetBufferFromEntity<QueueData0>(),
+//            queue1Access = GetBufferFromEntity<QueueData1>(),
+//            queue2Access = GetBufferFromEntity<QueueData2>(),
+//            queue3Access = GetBufferFromEntity<QueueData3>()
+//        };
+//        jobHandle = updateT.Schedule(this, jobHandle);
+//        
+//        var nextRoad = new SelectNextRoad() {};
+//        jobHandle = nextRoad.Schedule(this, jobHandle);
+//        return jobHandle;
+//    }
+//}
+
 //// TODO execute before spline evaluation system
 //[UpdateInGroup(typeof(SimulationSystemGroup))]
-//public class TrackSplineSystem : ComponentSystem
+//public class RoadSystemV2 : ComponentSystem
 //{
 //    static readonly float maxSpeed = 2f;
 //    EntityQuery m_Query;

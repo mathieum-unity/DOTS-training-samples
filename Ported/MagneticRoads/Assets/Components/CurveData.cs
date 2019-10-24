@@ -128,6 +128,22 @@ public struct SplineSideDirection : IComponentData
 {
 	public byte DirectionValue;
 	public byte SideValue;
+
+	public int QueueIndex()
+	{
+		return DirectionValue + SideValue * 2;
+	}
+	
+	public static SplineSideDirection GetDirectionForIndex(int i)
+	{
+		var laneDir = new SplineSideDirection()
+		{
+			DirectionValue = (byte) ((i % 2) * 2),
+			SideValue = (byte) (((i >> 1) % 2) * 2)
+		};
+		return laneDir;
+	}
+
 }
 
 public struct Disabled:IComponentData{}

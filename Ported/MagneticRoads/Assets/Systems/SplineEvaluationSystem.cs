@@ -7,7 +7,8 @@ using Unity.Transforms;
 using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(TrackSplineSystem))]
+[UpdateAfter(typeof(RoadSystemV2))]
+[UpdateBefore(typeof(TransformSystemGroup))]
 public class SplineEvaluationSystem : JobComponentSystem
 {
     public static float3 EvaluateBezier(float tValue, [ReadOnly] ref BezierData curve)
@@ -241,17 +242,58 @@ public class SplineEvaluationSystem : JobComponentSystem
 
 
    // [BurstCompile]
-    struct EvaluateSplineUpForward : IJobForEach<SplineT, BezierData, SplineSideDirection, Translation, Rotation>
+    struct EvaluateSplineUpForward : IJobForEachWithEntity<BezierData, SplineSideDirection, RoadReference, Translation, Rotation>
     {
-        public void Execute([ReadOnly] ref SplineT splineTimer,
+        [ReadOnly] public BufferFromEntity<QueueData0> queue0Access;
+        [ReadOnly] public BufferFromEntity<QueueData1> queue1Access;
+        [ReadOnly] public BufferFromEntity<QueueData2> queue2Access;
+        [ReadOnly] public BufferFromEntity<QueueData3> queue3Access;
+        
+        float FindSplineTimerValue<QueueType>(Entity carEntity, 
+            DynamicBuffer<QueueType> buffer) where QueueType: struct, IQueueEntry
+        {
+            for (int i = 0; i < buffer.Length; ++i)
+            {
+                if (buffer[i].carId == carEntity)
+                {
+                    return buffer[i].SplineTimer;
+                }
+            }
+
+            return 0;
+        }
+        
+        
+        public void Execute(Entity carEntity, int index, 
             [ReadOnly] ref BezierData curve,
             [ReadOnly] ref SplineSideDirection dir,
+            [ReadOnly] ref RoadReference currentRoad,
             ref Translation position, ref Rotation rotation)
         {
             int direction = ((int) dir.DirectionValue) - 1;
             int side = ((int) dir.SideValue) - 1;
 
-            float tValue = splineTimer.Value;
+            int queueIndex = dir.QueueIndex();
+
+            float tValue = 0;
+            switch (queueIndex)
+            {
+                case 0:
+                    tValue = FindSplineTimerValue(carEntity, queue0Access[currentRoad.Value]); 
+                    break;
+                case 1:
+                    tValue = FindSplineTimerValue(carEntity, queue1Access[currentRoad.Value]); 
+                    break;
+                case 2:
+                    tValue = FindSplineTimerValue(carEntity, queue2Access[currentRoad.Value]); 
+                    break;
+                case 3:
+                    tValue = FindSplineTimerValue(carEntity, queue3Access[currentRoad.Value]); 
+                    break;
+                default:
+                    break;
+            }
+            
             if (direction == -1)
             {
                 tValue = 1f - tValue;
@@ -269,35 +311,23 @@ public class SplineEvaluationSystem : JobComponentSystem
             position.Value = splinePoint + math.normalize(up) * .06f;
             rotation.Value = rot;
         }
+
     }
 
-    struct UpdateT : IJobForEach<SplineT, SplineSideDirection>
-    {
-        public float deltaTime;
-        public void Execute(ref SplineT t,
-            ref SplineSideDirection dir
-        )
-        {
-            t.Value += deltaTime * 0.3f;
-
-            if (t.Value > 1)
-            {
-                t.Value = 0;
-                
-                int direction = ((int) dir.DirectionValue) - 1;
-                direction *= -1;
-                dir.DirectionValue = (byte)(direction + 1);
-            }
-        }
-    }
 
     protected override JobHandle OnUpdate(JobHandle inputDependencies)
     {
-        //var updateT = new UpdateT() {deltaTime = Time.deltaTime};
-        //var jobHandle = updateT.Schedule(this, inputDependencies);
+        var jobHandle = inputDependencies;
+
+        var upForward = new EvaluateSplineUpForward()
+        {
+            queue0Access = GetBufferFromEntity<QueueData0>(),
+            queue1Access = GetBufferFromEntity<QueueData1>(),
+            queue2Access = GetBufferFromEntity<QueueData2>(),
+            queue3Access = GetBufferFromEntity<QueueData3>(),
+        };
         
-        var upForward = new EvaluateSplineUpForward();
-        var jobHandle = upForward.Schedule(this, inputDependencies);
+        jobHandle = upForward.Schedule(this, jobHandle);
 
         return jobHandle;
 //        var posHandle = posJob.Schedule(this, upForwardHandle);
