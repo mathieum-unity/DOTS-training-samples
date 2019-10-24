@@ -14,7 +14,7 @@ public class CarRenderer : MonoBehaviour
     [SerializeField]
     Material m_Material;
 
-    const int k_BlockSize = 512;
+    const int k_BlockSize = 1023;
 
     struct DrawInstancedArgs
     {
@@ -24,21 +24,18 @@ public class CarRenderer : MonoBehaviour
         public int size;
     }
 
-    static CarRenderer s_Instance = null;
+    static List<CarRenderer> s_Instances = new List<CarRenderer>();
+    
     public static CarRenderer GetInstance()
     {
-        return s_Instance;
+        if (s_Instances.Count == 0)
+            return null;
+        return s_Instances[0];
     }
 
-    void Awake()
-    {
-        s_Instance = this;
-    }
+    void Awake() { s_Instances.Add(this); }
 
-    void OnDestroy()
-    {
-        s_Instance = null;
-    }
+    void OnDestroy() { s_Instances.Remove(this); }
 
     Stack<DrawInstancedArgs> m_ArgsPool = new Stack<DrawInstancedArgs>();
     List<DrawInstancedArgs> m_CurrentArgs = new List<DrawInstancedArgs>();

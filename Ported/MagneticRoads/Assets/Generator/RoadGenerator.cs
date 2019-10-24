@@ -21,9 +21,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	public float voxelSize = 1f;
 	public int trisPerMesh = 4000;
 	public Material roadMaterial;
-	public Material carMaterial;
 	public Mesh intersectionMesh;
-	public Mesh carMesh;
 	public float carSpeed=2f;
 	public int numCars;
 	public int maxGenerationTicks = 500000;
@@ -204,7 +202,7 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 	{
 
 		var carArchetype = dstManager.CreateArchetype(
-			typeof(RenderMesh),
+			typeof(ColorData),
 			typeof(LocalToWorld),
 			typeof(SplineT), 
 			typeof(SplineSideDirection), 
@@ -215,15 +213,6 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			typeof(Lane),
 			typeof(NormalizedSpeed),
 			typeof(Rotation));
-
-		
-		var materials = new List<Material>();
-		for (int i = 0; i != 64; ++i)
-		{
-			var m = new Material(carMaterial);
-			m.color = UnityEngine.Random.ColorHSV();
-			materials.Add(m);
-		}
 
 		int count = carCount;
 		var random = new Random(0x6E624EB7u);
@@ -266,15 +255,11 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 			dstManager.SetComponentData(e, next);
 			dstManager.SetComponentData(e, new NonUniformScale { Value = new float3(0.1f, 0.08f,0.12f) });
 			dstManager.SetComponentData(e, trackSpline.curve);
-			dstManager.SetSharedComponentData(e, new RenderMesh
-				{
-					mesh = carMesh,
-					castShadows = ShadowCastingMode.On,
-					layer = 0,
-					material = materials[random.NextInt(materials.Count)],
-					receiveShadows = true,
-					subMesh = 0
-				});
+			var color = UnityEngine.Random.ColorHSV();
+			dstManager.SetComponentData(e, new ColorData
+			{
+				value = new float4(color.r, color.g, color.b, color.a)
+			});
 
 			currentCarsOnRoad++;
 

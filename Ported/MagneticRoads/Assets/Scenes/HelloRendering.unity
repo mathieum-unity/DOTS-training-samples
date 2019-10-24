@@ -157,7 +157,7 @@ MonoBehaviour:
   roadMaterial: {fileID: 2100000, guid: c2261b4990b26324bac9164b7f53de5e, type: 2}
   intersectionMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   carSpeed: 2
-  numCars: 64
+  numCars: 4096
   maxGenerationTicks: 20000
 --- !u!114 &112166903
 MonoBehaviour:
@@ -217,7 +217,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   m_Material: {fileID: 2100000, guid: 4c39503763071fe41842a84ac737905d, type: 2}
-  m_InstancesCount: 2
 --- !u!4 &1252857304
 Transform:
   m_ObjectHideFlags: 0
