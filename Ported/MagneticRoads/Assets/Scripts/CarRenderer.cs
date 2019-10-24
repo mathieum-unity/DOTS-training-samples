@@ -30,7 +30,6 @@ public class CarRenderer : MonoBehaviour
 
     NativeArray<float4> m_Colors;
     public NativeArray<float4> colors { get { return m_Colors; } }
-    int m_Size = 0;
     
     DrawInstancedArgs CreateArgs()
     {
@@ -152,14 +151,13 @@ public class CarRenderer : MonoBehaviour
     
     public void Resize(int size)
     {
-        m_Size = size;
         // just check transforms cause both buffers are always resized together
-        if (m_Transforms.IsCreated && m_Transforms.Length >= size)
+        if (m_Transforms.IsCreated && m_Transforms.Length == size)
             return;
         // we need to resize arrays
         ClearBuffers();
-        m_Transforms = new NativeArray<float4x4>(m_Size, Allocator.Persistent);
-        m_Colors = new NativeArray<float4>(m_Size, Allocator.Persistent); 
+        m_Transforms = new NativeArray<float4x4>(size, Allocator.Persistent);
+        m_Colors = new NativeArray<float4>(size, Allocator.Persistent); 
     }
     
     void Update()
