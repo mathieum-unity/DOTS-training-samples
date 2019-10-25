@@ -61,40 +61,40 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 		SpawnRoads();
 
-		var intersectionStateBuffer = dstManager.AddBuffer<IntersectionStateElementData>(entity);
-		intersectionStateBuffer.Reserve(intersections.Count);
-
-		foreach (var intersection in intersections)
-			intersectionStateBuffer.Add(new IntersectionStateElementData());
-
-		var trackSplineStateBuffer = dstManager.AddBuffer<TrackSplineStateElementData>(entity);
-		trackSplineStateBuffer.Reserve(trackSplines.Count);
-
-		foreach (var trackSpline in trackSplines)
-			trackSplineStateBuffer.Add(new TrackSplineStateElementData());
-
-		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
-		intersectionBuffer.Reserve(intersections.Count);
+//		var intersectionStateBuffer = dstManager.AddBuffer<IntersectionStateElementData>(entity);
+//		intersectionStateBuffer.Reserve(intersections.Count);
+//
+//		foreach (var intersection in intersections)
+//			intersectionStateBuffer.Add(new IntersectionStateElementData());
+//
+//		var trackSplineStateBuffer = dstManager.AddBuffer<TrackSplineStateElementData>(entity);
+//		trackSplineStateBuffer.Reserve(trackSplines.Count);
+//
+//		foreach (var trackSpline in trackSplines)
+//			trackSplineStateBuffer.Add(new TrackSplineStateElementData());
+//
+//		var intersectionBuffer = dstManager.AddBuffer<IntersectionElementData>(entity);
+//		intersectionBuffer.Reserve(intersections.Count);
 
 		foreach (var intersection in intersections)
 		{
 			var neighbourCount = intersection.neighborSplines.Count;
 
-			var intersectionElement = new IntersectionElementData()
-			{
-				position = intersection.position,
-				normal = (Vector3) intersection.normal,
-				neighbouringSpline0 = -1,
-				neighbouringSpline1 = -1,
-				neighbouringSpline2 = -1,
-				neighbourCount = neighbourCount
-			};
-
-			for (var j = 0; j < neighbourCount; ++j)
-				intersectionElement[j] = trackSplines.IndexOf(intersection.neighborSplines[j]);
-
-			intersectionBuffer = dstManager.GetBuffer<IntersectionElementData>(entity);
-			intersectionBuffer.Add(intersectionElement);
+//			var intersectionElement = new IntersectionElementData()
+//			{
+//				position = intersection.position,
+//				normal = (Vector3) intersection.normal,
+//				neighbouringSpline0 = -1,
+//				neighbouringSpline1 = -1,
+//				neighbouringSpline2 = -1,
+//				neighbourCount = neighbourCount
+//			};
+//
+//			for (var j = 0; j < neighbourCount; ++j)
+//				intersectionElement[j] = trackSplines.IndexOf(intersection.neighborSplines[j]);
+//
+//			intersectionBuffer = dstManager.GetBuffer<IntersectionElementData>(entity);
+//			intersectionBuffer.Add(intersectionElement);
 
 			var interSectionEntity = dstManager.CreateEntity();
 			dstManager.AddComponentData(interSectionEntity, new NeighborSpline());
@@ -108,16 +108,12 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		SpawnRoadRenderables(dstManager, renderable);
 		SpawnIntersectionRenderables(dstManager, renderable);
 
-		var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
-		trackSplineBuffer.Reserve(trackSplines.Count);
+//		var trackSplineBuffer = dstManager.AddBuffer<TrackSplineElementData>(entity);
+//		trackSplineBuffer.Reserve(trackSplines.Count);
 
 		foreach (var trackSpline in trackSplines)
 		{
-			var trackSplineElement = new TrackSplineElementData()
-			{
-				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
-				endIntersection = intersections.IndexOf(trackSpline.endIntersection),
-				curve = new BezierData()
+			var curve = new BezierData()
 				{
 					startPoint = trackSpline.startPoint,
 					startNormal = (Vector3) trackSpline.startNormal,
@@ -128,19 +124,24 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 					anchor1 = trackSpline.anchor1,
 					anchor2 = trackSpline.anchor2,
 					twistMode = trackSpline.twistMode
-				},
-				measuredLength = trackSpline.measuredLength,
-				maxCarCount = trackSpline.maxCarCount,
-				carQueueSize = trackSpline.carQueueSize,
-				twistMode = trackSpline.twistMode
-			};
-			trackSplineBuffer = dstManager.GetBuffer<TrackSplineElementData>(entity);
-			trackSplineBuffer.Add(trackSplineElement);
+				};
+//			var trackSplineElement = new TrackSplineElementData()
+//			{
+//				startIntersection = intersections.IndexOf(trackSpline.startIntersection),
+//				endIntersection = intersections.IndexOf(trackSpline.endIntersection),
+//              curve = curve,
+//				measuredLength = trackSpline.measuredLength,
+//				maxCarCount = trackSpline.maxCarCount,
+//				carQueueSize = trackSpline.carQueueSize,
+//				twistMode = trackSpline.twistMode
+//			};
+//			trackSplineBuffer = dstManager.GetBuffer<TrackSplineElementData>(entity);
+//			trackSplineBuffer.Add(trackSplineElement);
 
 			var roadEntity = dstManager.CreateEntity();
 			roadEntities.Add(roadEntity);
 
-			dstManager.AddComponentData(roadEntity, trackSplineElement.curve);
+			dstManager.AddComponentData(roadEntity, curve);
 			dstManager.AddComponentData(roadEntity, new SplineLength() {Value = trackSpline.measuredLength});
 			var rd = new RoadData()
 			{
@@ -262,6 +263,23 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		freeRoads[lastIndex] = swap;
 		return swap;
 	}
+
+	public Entity CreateLane(EntityManager dstManager, Entity road,ref  RoadData roadData, ref  SplineSideDirection sideDirection)
+	{
+		BezierData laneCurve = dstManager.GetComponentData<BezierData>(road);
+
+		var lane = dstManager.CreateEntity();
+		
+		dstManager.AddComponentData(lane,laneCurve);
+		dstManager.AddComponentData(lane,sideDirection);
+		dstManager.AddComponentData(lane,dstManager.GetComponentData<SplineLength>(road));
+		dstManager.AddComponentData(lane,new RoadReference(){Value = road});
+		dstManager.AddComponentData(lane, roadData);
+		
+		dstManager.AddBuffer<QueueData>(lane);
+		return lane;
+	}
+	
 	void SpawnCars(EntityManager dstManager, Entity entity, int carCount, int roadCount)
 	{
 
@@ -284,10 +302,10 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 		int currentCarsOnRoad = 0;
 		int currentRoadIndex = 0;
 		
-		var roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
-		var roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
-		var trackSpline = roads[currentRoadIndex];
-		var trackSplineState = roadStates[currentRoadIndex];
+//		var roads = dstManager.GetBuffer<TrackSplineElementData>(entity);
+//		var roadStates = dstManager.GetBuffer<TrackSplineStateElementData>(entity);
+//		var trackSpline = roads[currentRoadIndex];
+//		var trackSplineState = roadStates[currentRoadIndex];
 
 		List<Entity> freeRoads = new List<Entity>();
 		freeRoads.AddRange(roadEntities);
@@ -323,52 +341,24 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 
 			for (int tries = 0; tries < 4 && !added; ++tries)
 			{
-				laneDir = SplineSideDirection.GetDirectionForIndex(i+tries);
+				laneDir = SplineSideDirection.GetDirectionForIndex(i + tries);
 
 				switch (laneDir.QueueIndex())
 				{
 					case 0:
-					{
-						var b = dstManager.GetBuffer<QueueData0>(currentRoadEntity);
-						if (b.Length < rd.capacity)
-						{
-							b.Add(new QueueData0() {Value = e});
-							added = true;
-						}
-					}
+						added = TryAddCarToLane<Lane0>(dstManager, currentRoadEntity, ref rd, e, ref laneDir);
 						break;
 					case 1:
-					{
-						var b = dstManager.GetBuffer<QueueData1>(currentRoadEntity);
-						if (b.Length < rd.capacity)
-						{
-							b.Add(new QueueData1() {Value = e});
-							added = true;
-						}
-					}
-				break;
+						added = TryAddCarToLane<Lane1>(dstManager, currentRoadEntity, ref rd, e, ref laneDir);
+						break;
 					case 2:
-					{
-						var b = dstManager.GetBuffer<QueueData2>(currentRoadEntity);
-						if (b.Length < rd.capacity)
-						{
-							b.Add(new QueueData2() {Value = e});
-							added = true;
-						}
-					}
+						added = TryAddCarToLane<Lane2>(dstManager, currentRoadEntity, ref rd, e, ref laneDir);
 						break;
 					case 3:
-					{
-						var b = dstManager.GetBuffer<QueueData3>(currentRoadEntity);
-						if (b.Length < rd.capacity)
-						{
-							b.Add(new QueueData3() {Value = e});
-							added = true;
-						}
-					}
+						added = TryAddCarToLane<Lane3>(dstManager, currentRoadEntity, ref rd, e, ref laneDir);
 						break;
-						default:
-							break;
+					default:
+						break;
 				}
 			}
 
@@ -381,11 +371,6 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 				continue;
 			}
 
-			dstManager.SetComponentData(e, new SplineT(){Value = random.NextFloat(.0f, .8f)});
-			dstManager.AddComponentData(e, new SplineTConstraints(){MaxTValue =1});
-			dstManager.AddComponentData(e, new RoadReference(){Value = currentRoadEntity});
-
-				
 			dstManager.SetComponentData(e, laneDir);
 
 			//we then assign it to a road
@@ -434,6 +419,34 @@ public class RoadGenerator : MonoBehaviour, IConvertGameObjectToEntity
 //				trackSplineState = roadStates[currentRoadIndex];
 //			}
 		}
+	}
+
+	private bool TryAddCarToLane<LaneType>(EntityManager dstManager, Entity currentRoadEntity, ref RoadData rd, Entity e,
+		ref SplineSideDirection laneDir) where LaneType:struct, IComponentData, ILaneRef
+	{
+		bool added = false;
+		
+		LaneType laneRef = new LaneType();
+
+		if (dstManager.HasComponent<LaneType>(currentRoadEntity))
+		{
+			laneRef = dstManager.GetComponentData<LaneType>(currentRoadEntity);
+		}
+		else
+		{
+			laneRef.laneEntity = CreateLane(dstManager, currentRoadEntity, ref rd, ref laneDir);
+			dstManager.AddComponentData<LaneType>(currentRoadEntity, laneRef);
+		}
+
+		var b = dstManager.GetBuffer<QueueData>(laneRef.laneEntity);
+		if (b.Length < rd.capacity)
+		{
+			b.Add(new QueueData() {CarEntity = e});
+			dstManager.AddComponentData(e, new RoadReference() {Value = laneRef.laneEntity});
+			added = true;
+		}
+
+		return added;
 	}
 
 	// computes needed initial state for cars,

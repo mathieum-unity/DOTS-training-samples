@@ -241,16 +241,13 @@ public class SplineEvaluationSystem : JobComponentSystem
     }
 
 
-   // [BurstCompile]
+    [BurstCompile]
     struct EvaluateSplineUpForward : IJobForEachWithEntity<BezierData, SplineSideDirection, RoadReference, Translation, Rotation>
     {
-        [ReadOnly] public BufferFromEntity<QueueData0> queue0Access;
-        [ReadOnly] public BufferFromEntity<QueueData1> queue1Access;
-        [ReadOnly] public BufferFromEntity<QueueData2> queue2Access;
-        [ReadOnly] public BufferFromEntity<QueueData3> queue3Access;
+        [ReadOnly] public BufferFromEntity<QueueData> queueAccess;
         
-        float FindSplineTimerValue<QueueType>(Entity carEntity, 
-            DynamicBuffer<QueueType> buffer) where QueueType: struct, IQueueEntry
+        float FindSplineTimerValue(Entity carEntity, 
+            DynamicBuffer<QueueData> buffer)
         {
             for (int i = 0; i < buffer.Length; ++i)
             {
@@ -275,24 +272,7 @@ public class SplineEvaluationSystem : JobComponentSystem
 
             int queueIndex = dir.QueueIndex();
 
-            float tValue = 0;
-            switch (queueIndex)
-            {
-                case 0:
-                    tValue = FindSplineTimerValue(carEntity, queue0Access[currentRoad.Value]); 
-                    break;
-                case 1:
-                    tValue = FindSplineTimerValue(carEntity, queue1Access[currentRoad.Value]); 
-                    break;
-                case 2:
-                    tValue = FindSplineTimerValue(carEntity, queue2Access[currentRoad.Value]); 
-                    break;
-                case 3:
-                    tValue = FindSplineTimerValue(carEntity, queue3Access[currentRoad.Value]); 
-                    break;
-                default:
-                    break;
-            }
+            float tValue = FindSplineTimerValue(carEntity, queueAccess[currentRoad.Value]);
             
             if (direction == -1)
             {
@@ -308,7 +288,7 @@ public class SplineEvaluationSystem : JobComponentSystem
             float3 splinePoint = Extrude(extrudePoint, tValue, ref curve, out forward, out up, out rot);
 
             up *= side;
-            position.Value = splinePoint + math.normalize(up) * .06f;
+            position.Value = splinePoint + /*math.normalize(up)*/up * .06f;
             rotation.Value = rot;
         }
 
@@ -321,10 +301,7 @@ public class SplineEvaluationSystem : JobComponentSystem
 
         var upForward = new EvaluateSplineUpForward()
         {
-            queue0Access = GetBufferFromEntity<QueueData0>(),
-            queue1Access = GetBufferFromEntity<QueueData1>(),
-            queue2Access = GetBufferFromEntity<QueueData2>(),
-            queue3Access = GetBufferFromEntity<QueueData3>(),
+            queueAccess = GetBufferFromEntity<QueueData>(),
         };
         
         jobHandle = upForward.Schedule(this, jobHandle);

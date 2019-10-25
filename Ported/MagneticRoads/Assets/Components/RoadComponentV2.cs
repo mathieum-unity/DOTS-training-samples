@@ -9,6 +9,14 @@ public interface IQueueEntry
     float SplineTimer { get; set; }
 }
 
+public struct QueueData : IBufferElementData
+{
+    public Entity CarEntity;
+    public SplineTConstraints constraints;
+    public float NormalizedSpeed;
+    public float SplineTimer;
+    public Entity carId => CarEntity;
+}
 public struct QueueData0 : IBufferElementData, IQueueEntry
 {
     public Entity Value;
@@ -157,6 +165,11 @@ public struct RoadReference : IComponentData
     public Entity Value;
 }
 
+public struct Capacity: IComponentData
+{
+    public int Value;
+}
+
 public struct RoadData : IComponentData
 {
     public Entity startIntersection;
@@ -164,6 +177,33 @@ public struct RoadData : IComponentData
     public int capacity;
 }
 
+public interface ILaneRef
+{
+    Entity laneEntity { get; set; }
+}
+
+public struct Lane0 :IComponentData,ILaneRef
+{
+    public Entity Value;
+    public Entity laneEntity { get => Value; set => Value = value; }
+}
+
+public struct Lane1:IComponentData,ILaneRef
+{
+    public Entity Value;
+    public Entity laneEntity { get => Value; set => Value = value; }
+}
+
+public struct Lane2:IComponentData,ILaneRef
+{
+    public Entity Value;
+    public Entity laneEntity { get => Value; set => Value = value; }
+}
+public struct Lane3:IComponentData,ILaneRef
+{
+    public Entity Value;
+    public Entity laneEntity { get => Value; set => Value = value; }
+}
 public struct NeighborSpline : IComponentData
 {
     public Entity Value0;

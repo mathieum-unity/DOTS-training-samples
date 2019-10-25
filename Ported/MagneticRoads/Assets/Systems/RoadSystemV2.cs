@@ -13,7 +13,7 @@ using Random = Unity.Mathematics.Random;
 public class RoadSystemV2 : JobComponentSystem
 {
     [BurstCompile]
-    struct UpdateSpline<QueueType> : IJobForEach_BCCC<QueueType, BezierData, RoadData, SplineLength> where QueueType: struct, IBufferElementData, IQueueEntry
+    struct UpdateLaneQueue : IJobForEach_BCCC<QueueData, BezierData, RoadData, SplineLength>
     {
         [ReadOnly]public ComponentDataFromEntity<SplineT> splineAccess;
         [ReadOnly]public ComponentDataFromEntity<IntersectionData> intersectionAccess;
@@ -23,7 +23,7 @@ public class RoadSystemV2 : JobComponentSystem
         public int direction;
         public int side;
  
-        public float UpdateSpeed(ref QueueType queueEntry, float measureLength, float maxTValue, bool first, bool slowDown)
+        public float UpdateSpeed(ref QueueData queueEntry, float measureLength, float maxTValue, bool first, bool slowDown)
         {
             var splineConstraints = new SplineTConstraints() {MaxTValue = maxTValue, isFirst = first, needsSlowDown = slowDown};
             
@@ -82,7 +82,7 @@ public class RoadSystemV2 : JobComponentSystem
             return queueEntry.SplineTimer;
         }
         
-        public void Execute(DynamicBuffer<QueueType> queue,
+        public void Execute(DynamicBuffer<QueueData> queue,
             [ReadOnly] ref BezierData curve,
             [ReadOnly] ref RoadData rd,
             [ReadOnly] ref SplineLength splineLength)
@@ -90,7 +90,7 @@ public class RoadSystemV2 : JobComponentSystem
             if (queue.Length <= 1)
                 return;
 
-            QueueType first = queue[0];
+            QueueData first = queue[0];
 
             float spacing = 1.0f / rd.capacity;
 
@@ -113,11 +113,23 @@ public class RoadSystemV2 : JobComponentSystem
             queue[0] = first;
             for (int i = 1; i < queue.Length; ++i)
             {
-                QueueType second = queue[i];
+                QueueData second = queue[i];
                 
                 maxT = UpdateSpeed(ref second,splineLength.Value,maxT - spacing, false, false);
                 queue[i] = second;
             }
+
+
+            if (first.SplineTimer > 1) //we're at the end!
+            {
+                SwitchIntersections(queue);
+
+            }
+        }
+
+        void SwitchIntersections(DynamicBuffer<QueueData> queue)
+        {
+            
         }
     }
     
@@ -130,7 +142,7 @@ public class RoadSystemV2 : JobComponentSystem
     {
         float dt = Time.deltaTime;
 
-        var updateSplineT0 = new UpdateSpline<QueueData0>()
+        var updateSplineT0 = new UpdateLaneQueue()
         {
             splineAccess = GetComponentDataFromEntity<SplineT>(),
             intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
@@ -139,33 +151,33 @@ public class RoadSystemV2 : JobComponentSystem
             m_DeltaTime = dt,
         };
 
-
-        var updateSplineT1 = new UpdateSpline<QueueData1>()
-        {
-            splineAccess = GetComponentDataFromEntity<SplineT>(),
-            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
-            direction=1,
-            side = 0,
-            m_DeltaTime = dt,
-        };
-
-        var updateSplineT2 = new UpdateSpline<QueueData2>()
-        {
-            splineAccess = GetComponentDataFromEntity<SplineT>(),
-            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
-            direction=0,
-            side = 1,
-            m_DeltaTime = dt,
-        };
-
-        var updateSplineT3 = new UpdateSpline<QueueData3>()
-        {
-            splineAccess = GetComponentDataFromEntity<SplineT>(),
-            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
-            direction=1,
-            side = 1,
-            m_DeltaTime = dt,
-        };
+//
+//        var updateSplineT1 = new UpdateSpline<QueueData1>()
+//        {
+//            splineAccess = GetComponentDataFromEntity<SplineT>(),
+//            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+//            direction=1,
+//            side = 0,
+//            m_DeltaTime = dt,
+//        };
+//
+//        var updateSplineT2 = new UpdateSpline<QueueData2>()
+//        {
+//            splineAccess = GetComponentDataFromEntity<SplineT>(),
+//            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+//            direction=0,
+//            side = 1,
+//            m_DeltaTime = dt,
+//        };
+//
+//        var updateSplineT3 = new UpdateSpline<QueueData3>()
+//        {
+//            splineAccess = GetComponentDataFromEntity<SplineT>(),
+//            intersectionAccess = GetComponentDataFromEntity<IntersectionData>(),
+//            direction=1,
+//            side = 1,
+//            m_DeltaTime = dt,
+//        };
         
 //        var updateSplineAll = new UpdateSplineAll()
 //        {
@@ -174,17 +186,18 @@ public class RoadSystemV2 : JobComponentSystem
 //            CommandBuffer = m_Barrier.CreateCommandBuffer().ToConcurrent(),
 //        };
 
+        var updateJobDeps = updateSplineT0.Schedule(this, inputDeps);
 
-        NativeArray<JobHandle> updateJobs = new NativeArray<JobHandle>(4, Allocator.Temp);
-        
-        updateJobs[0] = updateSplineT0.Schedule(this, inputDeps);
-        updateJobs[1] = updateSplineT1.Schedule(this, inputDeps);
-        updateJobs[2] = updateSplineT2.Schedule(this, inputDeps);
-        updateJobs[3] = updateSplineT3.Schedule(this, inputDeps);
-        
-        var updateJobDeps = JobHandle.CombineDependencies(updateJobs);
-
-        updateJobs.Dispose();
+//        NativeArray<JobHandle> updateJobs = new NativeArray<JobHandle>(4, Allocator.Temp);
+//        
+//        updateJobs[0] = updateSplineT0.Schedule(this, inputDeps);
+//        updateJobs[1] = updateSplineT1.Schedule(this, inputDeps);
+//        updateJobs[2] = updateSplineT2.Schedule(this, inputDeps);
+//        updateJobs[3] = updateSplineT3.Schedule(this, inputDeps);
+//        
+//        var updateJobDeps = JobHandle.CombineDependencies(updateJobs);
+//
+//        updateJobs.Dispose();
 
         return updateJobDeps;
     }

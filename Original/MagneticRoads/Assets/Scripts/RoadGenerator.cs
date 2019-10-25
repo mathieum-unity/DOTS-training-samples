@@ -318,7 +318,7 @@ public class RoadGenerator:MonoBehaviour {
 		// spawn cars
 
 		batch = 0;
-		for (int i = 0; i < 4000; i++) {
+		for (int i = 0; i < 40000; i++) {
 			Car car = new Car();
 			car.maxSpeed = carSpeed;
 			car.roadSpline = trackSplines[Random.Range(0,trackSplines.Count)];

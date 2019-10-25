@@ -106,6 +106,22 @@ public struct BezierData : IComponentData
 	public float3 startTangent;
 	public float3 endTangent;
 	public int twistMode;
+
+//	public BezierData Inverse()
+//	{
+//		return new BezierData()
+//		{
+//			startPoint = this.endPoint,
+//			anchor1 = this.anchor2,
+//			anchor2 = this.anchor1,
+//			endPoint = this.startPoint,
+//			startNormal = this.endNormal,
+//			endNormal = this.startNormal,
+//			startTangent = this.endTangent,
+//			endTangent = this.startTangent,
+//			twistMode = this.twistMode
+//		};
+//	}
 }
 
 public struct SplineLength : IComponentData
